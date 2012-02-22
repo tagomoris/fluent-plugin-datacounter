@@ -1,5 +1,3 @@
-require "fluent/plugin/out_datacounter/version"
-
 class Fluent::DataCounterOutput < Fluent::Output
   Fluent::Plugin.register_output('datacounter', self)
 
