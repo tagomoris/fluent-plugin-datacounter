@@ -108,7 +108,7 @@ class Fluent::DataCounterOutput < Fluent::Output
         name = @patterns[i][1]
         output[name + '_count'] = count
         output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        output[name + '_percentage'] = count * 100.0 / (1.00 * sum)
+        output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 1
       end
       return output
     end
@@ -120,7 +120,7 @@ class Fluent::DataCounterOutput < Fluent::Output
         name = @patterns[i][1]
         output[t + '_' + name + '_count'] = count
         output[t + '_' + name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum)
+        output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 1
       end
     end
     output
