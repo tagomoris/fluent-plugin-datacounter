@@ -1,7 +1,5 @@
 module Fluent
-  module Plugin
-    module DataCounterOutput
-      VERSION = "0.0.1"
-    end
+  class DataCounterOutput < Fluent::Output
+    VERSION = "0.0.1"
   end
 end
