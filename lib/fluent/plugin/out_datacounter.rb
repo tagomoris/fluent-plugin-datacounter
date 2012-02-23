@@ -74,7 +74,10 @@ class Fluent::DataCounterOutput < Fluent::Output
     if @aggregate == :all
       {'all' => ([0] * @patterns.length)}
     elsif keys
-      Hash[[keys, ([[0] * @patterns.length])*(keys.length)].transpose]
+      values = Array.new(keys.length) {|i|
+        Array.new(@patterns.length){|j| 0 }
+      }
+      Hash[[keys, values].transpose]
     else
       {}
     end
@@ -106,7 +109,7 @@ class Fluent::DataCounterOutput < Fluent::Output
         name = @patterns[i][1]
         output[name + '_count'] = count
         output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 1
+        output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
       end
       return output
     end
@@ -118,14 +121,14 @@ class Fluent::DataCounterOutput < Fluent::Output
         name = @patterns[i][1]
         output[t + '_' + name + '_count'] = count
         output[t + '_' + name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 1
+        output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
       end
     end
     output
   end
 
   def flush(step)
-    flushed,@counts = @counts,count_initialized(@counts.keys)
+    flushed,@counts = @counts,count_initialized(@counts.keys.dup)
     generate_output(flushed, step)
   end
 
