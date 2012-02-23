@@ -1,6 +1,7 @@
 class Fluent::DataCounterOutput < Fluent::Output
   Fluent::Plugin.register_output('datacounter', self)
 
+  config_param :count_interval, :time, :default => nil
   config_param :unit, :string, :default => 'minute'
   config_param :aggregate, :string, :default => 'tag'
   config_param :tag, :string, :default => 'datacount'
@@ -13,19 +14,25 @@ class Fluent::DataCounterOutput < Fluent::Output
     config_param ('pattern' + i.to_s).to_sym, :string, :default => nil # NAME REGEXP
   end
 
+  attr_accessor :tick
   attr_accessor :counts
   attr_accessor :last_checked
 
   def configure(conf)
     super
 
-    @unit = case @unit
-            when 'minute' then :minute
-            when 'hour' then :hour
-            when 'day' then :day
-            else
-              raise Fluent::ConfigError, "flowcounter unit allows minute/hour/day"
-            end
+    if @count_interval
+      @tick = @count_interval.to_i
+    else
+      @tick = case @unit
+              when 'minute' then 60
+              when 'hour' then 3600
+              when 'day' then 86400
+              else 
+                raise RuntimeError, "@unit must be one of minute/hour/day"
+              end
+    end
+
     @aggregate = case @aggregate
                  when 'tag' then :tag
                  when 'all' then :all
@@ -144,16 +151,9 @@ class Fluent::DataCounterOutput < Fluent::Output
   def watch
     # instance variable, and public accessable, for test
     @last_checked = Fluent::Engine.now
-    tick = case @unit
-           when :minute then 60
-           when :hour then 3600
-           when :day then 86400
-           else 
-             raise RuntimeError, "@unit must be one of minute/hour/day"
-           end
     while true
       sleep 0.5
-      if Fluent::Engine.now - @last_checked >= tick
+      if Fluent::Engine.now - @last_checked >= @tick
         now = Fluent::Engine.now
         flush_emit(now - @last_checked)
         @last_checked = now

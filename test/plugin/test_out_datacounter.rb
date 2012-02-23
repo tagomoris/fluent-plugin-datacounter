@@ -58,12 +58,45 @@ class DataCounterOutputTest < Test::Unit::TestCase
       count_key field
       pattern1 ok ^2\\d\\d$
     ]
-    assert_equal :minute, d.instance.unit
+    assert_equal 60, d.instance.tick
     assert_equal :tag, d.instance.aggregate
     assert_equal 'datacount', d.instance.tag
     assert_nil d.instance.input_tag_remove_prefix
     assert_equal 'field', d.instance.count_key
     assert_equal 'ok ^2\d\d$', d.instance.pattern1
+
+    d1 = create_driver %[
+      unit minute
+      count_key field
+      pattern1 ok ^2\\d\\d$
+    ]
+    d2 = create_driver %[
+      count_interval 60s
+      count_key field
+      pattern1 ok ^2\\d\\d$
+    ]
+    assert_equal d1.instance.tick, d2.instance.tick
+    
+    d = create_driver %[
+      count_interval 5m
+      count_key field
+      pattern1 ok ^2\\d\\d$
+    ]
+    assert_equal 300, d.instance.tick
+
+    d = create_driver %[
+      count_interval 2h
+      count_key field
+      pattern1 ok ^2\\d\\d$
+    ]
+    assert_equal 7200, d.instance.tick
+
+    d = create_driver %[
+      count_interval 30s
+      count_key field
+      pattern1 ok ^2\\d\\d$
+    ]
+    assert_equal 30, d.instance.tick
   end
 
   def test_count_initialized
