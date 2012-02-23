@@ -12,8 +12,8 @@ Count messages with data matches any of specified regexp patterns in specified a
 
 DataCounterOutput emits messages contains results data, so you can output these message (with 'datacount' tag by default) to any outputs you want.
 
-    output ex1 (aggragates all inputs): {"pattern1_count":20, "pattern1_rate":0.333, "pattern1_percentage":25.0, "pattern2_count":40, "pattern2_rate":0.666, "pattern2_percentage":50.0, "unmatched_count":20, "unmatched_rate":0.333, "unmatched_percentage":25.0}
-    output ex2 (aggragates per tag): {"test_pattern1_count":10, "test_pattern1_rate":0.333, "test_pattern1_percentage":25.0, "test_pattern2_count":40, "test_pattern2_rate":0.666, "test_pattern2_percentage":50.0, "test_unmatched_count":20, "test_unmatched_rate":0.333, "test_unmatched_percentage":25.0}
+    output ex1 (aggregates all inputs): {"pattern1_count":20, "pattern1_rate":0.333, "pattern1_percentage":25.0, "pattern2_count":40, "pattern2_rate":0.666, "pattern2_percentage":50.0, "unmatched_count":20, "unmatched_rate":0.333, "unmatched_percentage":25.0}
+    output ex2 (aggregates per tag): {"test_pattern1_count":10, "test_pattern1_rate":0.333, "test_pattern1_percentage":25.0, "test_pattern2_count":40, "test_pattern2_rate":0.666, "test_pattern2_percentage":50.0, "test_unmatched_count":20, "test_unmatched_rate":0.333, "test_unmatched_percentage":25.0}
 
 'input_tag_remove_prefix' option available if you want to remove tag prefix from output field names.
 
@@ -51,7 +51,7 @@ HTTP status code patterns.
 
     <match accesslog.**>
       type datacounter
-      unit min
+      unit minute
       count_key status
       # patternX: X(1-9)
       pattern1 2xx ^2\d\d$
