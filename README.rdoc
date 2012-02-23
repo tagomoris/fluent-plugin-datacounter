@@ -51,7 +51,8 @@ HTTP status code patterns.
 
     <match accesslog.**>
       type datacounter
-      unit minute
+      count_interval 1m    # just same as 'unit minute' and 'count_interval 60s'
+                           # you can also specify '30s', '5m', '2h' ....
       count_key status
       # patternX: X(1-9)
       pattern1 2xx ^2\d\d$
