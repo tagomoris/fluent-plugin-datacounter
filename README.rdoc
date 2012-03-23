@@ -28,7 +28,7 @@ Count messages that have attribute 'referer' as 'google.com', 'yahoo.com' and 'f
       unit minute
       aggregate all
       count_key referer
-      # patternX: X(1-9)
+      # patternX: X(1-20)
       pattern1 google google.com
       pattern2 yahoo  yahoo.com
       pattern3 facebook facebook.com
@@ -41,7 +41,7 @@ Or, more exact match pattern, output per tags (default 'aggregate tag'), per hou
       type datacounter
       unit hour
       count_key referer
-      # patternX: X(1-9)
+      # patternX: X(1-20)
       pattern1 google ^http://www\.google\.com/.*
       pattern2 yahoo  ^http://www\.yahoo\.com/.*
       pattern3 twitter ^https://twitter.com/.*
@@ -54,7 +54,7 @@ HTTP status code patterns.
       count_interval 1m    # just same as 'unit minute' and 'count_interval 60s'
                            # you can also specify '30s', '5m', '2h' ....
       count_key status
-      # patternX: X(1-9)
+      # patternX: X(1-20)
       pattern1 2xx ^2\d\d$
       pattern2 3xx ^3\d\d$
       pattern3 404 ^404$    # we want only 404 counts...
