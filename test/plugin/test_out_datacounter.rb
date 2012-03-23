@@ -177,6 +177,45 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 80.0, r2['hoge_percentage']
   end
 
+  def test_pattern_num
+    assert_equal 20, Fluent::DataCounterOutput::PATTERN_MAX_NUM
+
+    conf = %[
+      aggregate all
+      count_key field
+    ]
+    (1..20).each do |i|
+      conf += "pattern#{i} name#{i} ^#{i}$\n"
+    end
+    d = create_driver(conf, 'test.max')
+    d.run do
+      (1..20).each do |j|
+        d.emit({'field' => j})
+      end
+    end
+    r = d.instance.flush(60)
+    assert_equal 1, r['name1_count']
+    assert_equal 1, r['name2_count']
+    assert_equal 1, r['name3_count']
+    assert_equal 1, r['name4_count']
+    assert_equal 1, r['name5_count']
+    assert_equal 1, r['name6_count']
+    assert_equal 1, r['name7_count']
+    assert_equal 1, r['name8_count']
+    assert_equal 1, r['name9_count']
+    assert_equal 1, r['name10_count']
+    assert_equal 1, r['name11_count']
+    assert_equal 1, r['name12_count']
+    assert_equal 1, r['name13_count']
+    assert_equal 1, r['name14_count']
+    assert_equal 1, r['name15_count']
+    assert_equal 1, r['name16_count']
+    assert_equal 1, r['name17_count']
+    assert_equal 1, r['name18_count']
+    assert_equal 1, r['name19_count']
+    assert_equal 1, r['name20_count']
+  end
+
   def test_emit
     d1 = create_driver(CONFIG, 'test.tag1')
     d1.run do

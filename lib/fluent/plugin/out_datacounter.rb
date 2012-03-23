@@ -1,6 +1,8 @@
 class Fluent::DataCounterOutput < Fluent::Output
   Fluent::Plugin.register_output('datacounter', self)
 
+  PATTERN_MAX_NUM = 20
+
   config_param :count_interval, :time, :default => nil
   config_param :unit, :string, :default => 'minute'
   config_param :aggregate, :string, :default => 'tag'
@@ -10,7 +12,7 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   # pattern0 reserved as unmatched counts
   config_param :pattern1, :string # string: NAME REGEXP
-  (2..9).each do |i|
+  (2..PATTERN_MAX_NUM).each do |i|
     config_param ('pattern' + i.to_s).to_sym, :string, :default => nil # NAME REGEXP
   end
 
@@ -42,7 +44,12 @@ class Fluent::DataCounterOutput < Fluent::Output
 
     @patterns = [[0, 'unmatched', nil]]
     pattern_names = ['unmatched']
-    (1..9).each do |i|
+
+    invalids = conf.keys.select{|k| k =~ /^pattern(\d+)$/}.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
+    if invalids.size > 0
+      $log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
+    end
+    (1..PATTERN_MAX_NUM).each do |i|
       next unless conf["pattern#{i}"]
       name,regexp = conf["pattern#{i}"].split(' ', 2)
       @patterns.push([i, name, Regexp.new(regexp)])
