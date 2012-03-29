@@ -69,11 +69,11 @@ class Fluent::DataCounterOutput < Fluent::Output
     end
 
     @counts = count_initialized
+    @mutex = Mutex.new
   end
 
   def start
     super
-    @counts = count_initialized
     start_watch
   end
 
@@ -101,11 +101,13 @@ class Fluent::DataCounterOutput < Fluent::Output
     if @aggregate == :all
       tag = 'all'
     end
-    @counts[tag] ||= [0] * @patterns.length
-
-    counts.each_with_index do |count, i|
-      @counts[tag][i] += count
-    end
+    
+    @mutex.synchronize {
+      @counts[tag] ||= [0] * @patterns.length
+      counts.each_with_index do |count, i|
+        @counts[tag][i] += count
+      end
+    }
   end
 
   def stripped_tag(tag)
