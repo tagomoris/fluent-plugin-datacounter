@@ -9,6 +9,7 @@ class Fluent::DataCounterOutput < Fluent::Output
   config_param :tag, :string, :default => 'datacount'
   config_param :input_tag_remove_prefix, :string, :default => nil
   config_param :count_key, :string
+  config_param :count_unmatched, :bool, :default => true
 
   # pattern0 reserved as unmatched counts
   config_param :pattern1, :string # string: NAME REGEXP
@@ -185,7 +186,7 @@ class Fluent::DataCounterOutput < Fluent::Output
         matched = true
         break
       end
-      c[0] += 1 unless matched
+      c[0] += 1 if not matched and @count_unmatched
     end
     countups(tag, c)
 
