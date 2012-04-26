@@ -272,6 +272,30 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 0, data[2]['unmatched_count']
     assert_equal 0.0, data[2]['unmatched_rate']
     assert_equal 0.0, data[2]['unmatched_percentage']
+
+    d3 = create_driver(%[
+      aggregate all
+      count_key target
+      count_unmatched false
+      pattern1 ok 2\\d\\d
+    ], 'test.tag3')
+    d3.run do
+      60.times do
+        d3.emit({'target' => '200'})
+        d3.emit({'target' => '300'})
+      end
+    end
+    d3.instance.flush_emit(120)
+    emits = d3.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'datacount', data[0] # tag
+    assert_equal 60, data[2]['ok_count']
+    assert_equal 0.5, data[2]['ok_rate']
+    assert_equal 100.0, data[2]['ok_percentage']
+    assert_equal 0, data[2]['unmatched_count']
+    assert_equal 0.0, data[2]['unmatched_rate']
+    assert_equal 0.0, data[2]['unmatched_percentage']
   end
 
 end
