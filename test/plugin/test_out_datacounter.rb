@@ -64,6 +64,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_nil d.instance.input_tag_remove_prefix
     assert_equal 'field', d.instance.count_key
     assert_equal 'ok ^2\d\d$', d.instance.pattern1
+    assert_equal false, d.instance.outcast_unmatched
 
     d1 = create_driver %[
       unit minute
@@ -95,8 +96,10 @@ class DataCounterOutputTest < Test::Unit::TestCase
       count_interval 30s
       count_key field
       pattern1 ok ^2\\d\\d$
+      outcast_unmatched yes
     ]
     assert_equal 30, d.instance.tick
+    assert_equal true, d.instance.outcast_unmatched
   end
 
   def test_count_initialized
@@ -272,6 +275,57 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 0, data[2]['unmatched_count']
     assert_equal 0.0, data[2]['unmatched_rate']
     assert_equal 0.0, data[2]['unmatched_percentage']
-  end
 
+    d3 = create_driver(%[
+      count_key target
+      input_tag_remove_prefix test
+      pattern1 ok 2\\d\\d
+      pattern2 redirect 3\\d\\d
+      outcast_unmatched yes
+    ], 'test.tag2')
+    d3.run do
+      60.times do
+        d3.emit({'target' => '200'})
+        d3.emit({'target' => '300'})
+        d3.emit({'target' => '400'})
+      end
+    end
+    d3.instance.flush_emit(180)
+    emits = d3.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'datacount', data[0] # tag
+    assert_equal 60, data[2]['tag2_unmatched_count']
+    assert_nil data[2]['tag2_unmatched_percentage']
+    assert_equal 60, data[2]['tag2_ok_count']
+    assert_equal 50.0, data[2]['tag2_ok_percentage']
+    assert_equal 60, data[2]['tag2_redirect_count']
+    assert_equal 50.0, data[2]['tag2_redirect_percentage']
+
+    d3 = create_driver(%[
+      aggregate all
+      count_key target
+      pattern1 ok 2\\d\\d
+      pattern2 redirect 3\\d\\d
+      outcast_unmatched true
+    ], 'test.tag2')
+    d3.run do
+      60.times do
+        d3.emit({'target' => '200'})
+        d3.emit({'target' => '300'})
+        d3.emit({'target' => '400'})
+      end
+    end
+    d3.instance.flush_emit(180)
+    emits = d3.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'datacount', data[0] # tag
+    assert_equal 60, data[2]['unmatched_count']
+    assert_nil data[2]['unmatched_percentage']
+    assert_equal 60, data[2]['ok_count']
+    assert_equal 50.0, data[2]['ok_percentage']
+    assert_equal 60, data[2]['redirect_count']
+    assert_equal 50.0, data[2]['redirect_percentage']
+  end
 end

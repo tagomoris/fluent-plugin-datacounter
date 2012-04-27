@@ -9,6 +9,7 @@ class Fluent::DataCounterOutput < Fluent::Output
   config_param :tag, :string, :default => 'datacount'
   config_param :input_tag_remove_prefix, :string, :default => nil
   config_param :count_key, :string
+  config_param :outcast_unmatched, :bool, :default => false
 
   # pattern0 reserved as unmatched counts
   config_param :pattern1, :string # string: NAME REGEXP
@@ -120,24 +121,37 @@ class Fluent::DataCounterOutput < Fluent::Output
   def generate_output(counts, step)
     output = {}
     if @aggregate == :all
-      sum = counts['all'].inject(:+)
+      # index 0 is unmatched
+      sum = if @outcast_unmatched
+              counts['all'][1..-1].inject(:+)
+            else
+              counts['all'].inject(:+)
+            end
       counts['all'].each_with_index do |count,i|
         name = @patterns[i][1]
         output[name + '_count'] = count
         output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
+        unless i == 0 and @outcast_unmatched
+          output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
+        end
       end
       return output
     end
 
     counts.keys.each do |tag|
       t = stripped_tag(tag)
-      sum = counts[tag].inject(:+)
+      sum = if @outcast_unmatched
+              counts[tag][1..-1].inject(:+)
+            else
+              counts[tag].inject(:+)
+            end
       counts[tag].each_with_index do |count,i|
         name = @patterns[i][1]
         output[t + '_' + name + '_count'] = count
         output[t + '_' + name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
+        unless i == 0 and @outcast_unmatched
+          output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
+        end
       end
     end
     output

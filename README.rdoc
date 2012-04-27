@@ -62,6 +62,20 @@ HTTP status code patterns.
       pattern5 5xx ^5\d\d$
     </match>
 
+If you want not to include 'unmatched' counts into percentage, use 'outcast_unmatched' configuration:
+
+    <match accesslog.**>
+      type datacounter
+      count_key status
+      # patternX: X(1-20)
+      pattern1 2xx ^2\d\d$
+      pattern2 3xx ^3\d\d$
+      pattern3 4xx ^4\d\d$
+      pattern4 5xx ^5\d\d$
+      outcast_unmatched yes # '*_percentage' fields culculated without 'unmatched' counts, and
+                            # 'unmatched_percentage' field will not be produced
+    </match>
+
 == TODO
 
 - consider what to do next
