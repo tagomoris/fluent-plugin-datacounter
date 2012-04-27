@@ -177,7 +177,7 @@ class Fluent::DataCounterOutput < Fluent::Output
       value = record[@count_key]
       next if value.nil?
 
-      value = value.to_s
+      value = value.to_s.force_encoding('ASCII-8BIT')
       matched = false
       @patterns.each do |index, name, regexp|
         next unless regexp and regexp.match(value)
