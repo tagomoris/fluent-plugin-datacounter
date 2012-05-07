@@ -12,7 +12,7 @@ class Fluent::DataCounterOutput < Fluent::Output
   config_param :outcast_unmatched, :bool, :default => false
 
   # pattern0 reserved as unmatched counts
-  config_param :pattern1, :string # string: NAME REGEXP
+  config_param :pattern1, :string, :default => nil # string: NAME REGEXP
   (2..PATTERN_MAX_NUM).each do |i|
     config_param ('pattern' + i.to_s).to_sym, :string, :default => nil # NAME REGEXP
   end
@@ -64,6 +64,11 @@ class Fluent::DataCounterOutput < Fluent::Output
       raise Fluent::ConfigError, "duplicated pattern names"
     end
 
+    @auto_key = false
+    if @patterns.length == 1
+      @auto_key = true
+    end
+
     if @input_tag_remove_prefix
       @removed_prefix_string = @input_tag_remove_prefix + '.'
       @removed_length = @removed_prefix_string.length
@@ -102,7 +107,6 @@ class Fluent::DataCounterOutput < Fluent::Output
     if @aggregate == :all
       tag = 'all'
     end
-    
     @mutex.synchronize {
       @counts[tag] ||= [0] * @patterns.length
       counts.each_with_index do |count, i|
@@ -199,7 +203,23 @@ class Fluent::DataCounterOutput < Fluent::Output
         matched = true
         break
       end
-      c[0] += 1 unless matched
+      unless matched
+        if @auto_key
+          index = @patterns.length
+          c[index] = 1
+          @patterns.push([index, [@count_key, value].join("_"), value])
+          if @aggregate == :all
+            @counts['all'].push(0)
+          else
+            unless @counts[tag]
+              @counts[tag] = [0] * @patterns.length
+            end
+            @counts[tag][index] = 0
+          end
+        else
+          c[0] += 1
+        end
+      end
     end
     countups(tag, c)
 
