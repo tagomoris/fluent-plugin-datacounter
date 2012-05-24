@@ -54,6 +54,18 @@ class DataCounterOutputTest < Test::Unit::TestCase
         pattern2 hoge ^4\\d\\d$
       ]
     }
+    assert_raise(Fluent::ConfigError) {
+      d = create_driver %[
+        count_key field
+        count_all_patterns
+        pattern1 hoge ^1\\d\\d$
+      ]
+    }
+    assert_raise(Fluent::ConfigError) {
+      d = create_driver %[
+        count_all_patterns
+      ]
+    }
     d = create_driver %[
       count_key field
       pattern1 ok ^2\\d\\d$
@@ -100,6 +112,13 @@ class DataCounterOutputTest < Test::Unit::TestCase
     ]
     assert_equal 30, d.instance.tick
     assert_equal true, d.instance.outcast_unmatched
+
+    d = create_driver %[
+      count_key field
+      count_all_patterns
+    ]
+    assert_equal true, d.instance.count_all_patterns
+
   end
 
   def test_count_initialized
@@ -110,6 +129,12 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern2 moge 2\d\d
     ]
     assert_equal [0,0,0], d.instance.counts['all']
+    d = create_driver %[
+      aggregate all
+      count_key field
+      count_all_patterns
+    ]
+    assert_equal [0], d.instance.counts['all']
   end
 
   def test_countups
@@ -327,5 +352,51 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 50.0, data[2]['ok_percentage']
     assert_equal 60, data[2]['redirect_count']
     assert_equal 50.0, data[2]['redirect_percentage']
+
+  end
+  def test_count_all_patterns
+    d = create_driver %[
+      aggregate all
+      count_key target
+      count_all_patterns
+    ]
+    d.run do
+      30.times do
+        d.emit({'target' => 1})
+        d.emit({'target' => 1})
+        d.emit({'target' => 1})
+        d.emit({'target' => 5})
+        d.emit({'target' => 5})
+        d.emit({'target' => 9})
+      end
+    end
+    d.instance.flush_emit(180)
+    emits = d.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'datacount', data[0]
+    assert_equal 12, data[2].keys.length # 4 patterns (unmatched + 3) * 3 type (count, rate, percentage)
+    assert_equal 90, data[2]['target_1_count']
+    assert_equal 50.0, data[2]['target_1_percentage']
+    assert_equal 60, data[2]['target_5_count']
+    assert_equal 100.0/3, data[2]['target_5_percentage']
+    assert_equal 30, data[2]['target_9_count']
+    assert_equal 100.0/6, data[2]['target_9_percentage']
+
+    d.run do
+      30.times do
+        d.emit({'target' => 2})
+        d.emit({'target' => 2})
+        d.emit({'target' => 2})
+        d.emit({'target' => 7})
+        d.emit({'target' => 7})
+        d.emit({'target' => 10})
+      end
+    end
+    d.instance.flush_emit(180)
+    emits = d.emits
+    assert_equal 2, emits.length
+    data = emits[1]
+    assert_equal 21, data[2].keys.length # 7 patterns (unmatched + 3 + 3) * 3 type (count, rate, percentage)
   end
 end
