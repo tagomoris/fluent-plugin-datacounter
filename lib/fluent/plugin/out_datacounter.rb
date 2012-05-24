@@ -10,9 +10,10 @@ class Fluent::DataCounterOutput < Fluent::Output
   config_param :input_tag_remove_prefix, :string, :default => nil
   config_param :count_key, :string
   config_param :outcast_unmatched, :bool, :default => false
+  config_param :count_all_patterns, :bool, :default => false
 
   # pattern0 reserved as unmatched counts
-  config_param :pattern1, :string # string: NAME REGEXP
+  config_param :pattern1, :string, :default => nil # string: NAME REGEXP
   (2..PATTERN_MAX_NUM).each do |i|
     config_param ('pattern' + i.to_s).to_sym, :string, :default => nil # NAME REGEXP
   end
@@ -46,22 +47,38 @@ class Fluent::DataCounterOutput < Fluent::Output
     @patterns = [[0, 'unmatched', nil]]
     pattern_names = ['unmatched']
 
-    invalids = conf.keys.select{|k| k =~ /^pattern(\d+)$/}.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
-    if invalids.size > 0
-      $log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
+    @count_all_patterns = true if conf.has_key?('count_all_patterns')
+    if @count_all_patterns
+      if @pattern1
+        raise Fluent::ConfigError, 'patterns are ignored in count_all_patterns'
+      end
+    else
+      if not @pattern1
+        raise Fluent::ConfigError, 'patterns must be defined more than one'
+      end
+
+      invalids = conf.keys.select{|k| k =~ /^pattern(\d+)$/}.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
+      if invalids.size > 0
+        $log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
+      end
+      (1..PATTERN_MAX_NUM).each do |i|
+        next unless conf["pattern#{i}"]
+        name,regexp = conf["pattern#{i}"].split(' ', 2)
+        @patterns.push([i, name, Regexp.new(regexp)])
+        pattern_names.push(name)
+      end
+      pattern_index_list = conf.keys.select{|s| s =~ /^pattern\d$/}.map{|v| (/^pattern(\d)$/.match(v))[1].to_i}
+      unless pattern_index_list.reduce(true){|v,i| v and @patterns[i]}
+        raise Fluent::ConfigError, "jump of pattern index found"
+      end
+      unless @patterns.length == pattern_names.uniq.length
+        raise Fluent::ConfigError, "duplicated pattern names"
+      end
     end
-    (1..PATTERN_MAX_NUM).each do |i|
-      next unless conf["pattern#{i}"]
-      name,regexp = conf["pattern#{i}"].split(' ', 2)
-      @patterns.push([i, name, Regexp.new(regexp)])
-      pattern_names.push(name)
-    end
-    pattern_index_list = conf.keys.select{|s| s =~ /^pattern\d$/}.map{|v| (/^pattern(\d)$/.match(v))[1].to_i}
-    unless pattern_index_list.reduce(true){|v,i| v and @patterns[i]}
-      raise Fluent::ConfigError, "jump of pattern index found"
-    end
-    unless @patterns.length == pattern_names.uniq.length
-      raise Fluent::ConfigError, "duplicated pattern names"
+
+    @auto_key = false
+    if @patterns.length == 1
+      @auto_key = true
     end
 
     if @input_tag_remove_prefix
@@ -102,7 +119,6 @@ class Fluent::DataCounterOutput < Fluent::Output
     if @aggregate == :all
       tag = 'all'
     end
-    
     @mutex.synchronize {
       @counts[tag] ||= [0] * @patterns.length
       counts.each_with_index do |count, i|
@@ -199,7 +215,23 @@ class Fluent::DataCounterOutput < Fluent::Output
         matched = true
         break
       end
-      c[0] += 1 unless matched
+      unless matched
+        if @auto_key
+          index = @patterns.length
+          c[index] = 1
+          @patterns.push([index, [@count_key, value].join("_"), value])
+          if @aggregate == :all
+            @counts['all'].push(0)
+          else
+            unless @counts[tag]
+              @counts[tag] = [0] * @patterns.length
+            end
+            @counts[tag][index] = 0
+          end
+        else
+          c[0] += 1
+        end
+      end
     end
     countups(tag, c)
 
