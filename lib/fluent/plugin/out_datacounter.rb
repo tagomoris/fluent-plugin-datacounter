@@ -40,7 +40,7 @@ class Fluent::DataCounterOutput < Fluent::Output
                  when 'tag' then :tag
                  when 'all' then :all
                  else
-                   raise Fluent::ConfigError, "flowcounter aggregate allows tag/all"
+                   raise Fluent::ConfigError, "datacounter aggregate allows tag/all"
                  end
 
     @patterns = [[0, 'unmatched', nil]]
