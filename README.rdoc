@@ -76,6 +76,46 @@ If you want not to include 'unmatched' counts into percentage, use 'outcast_unma
                             # 'unmatched_percentage' field will not be produced
     </match>
 
+With 'output_per_tag' option and 'tag_prefix', we get one result message for one tag, like below:
+
+    <match accesslog.{foo,bar}>
+      type datacounter
+      count_key status
+      pattern1 OK ^2\d\d$
+      pattern2 NG ^\d\d\d$
+      input_tag_remove_prefix accesslog
+      output_per_tag yes
+      add_prefix status
+    </match>
+    # => tag: 'status.foo' or 'status.bar'
+    #    message: {'OK_count' => 60, 'OK_rate' => 1.0, 'OK_percentage' => 70, 'NG_count' => , ....}
+
+And you can get tested messages count with 'output_messages' option:
+
+    <match accesslog.{foo,bar}>
+      type datacounter
+      count_key status
+      pattern1 OK ^2\d\d$
+      pattern2 NG ^\d\d\d$
+      input_tag_remove_prefix accesslog
+      output_messages yes
+    </match>
+    # => tag: 'datacount'
+    #    message: {'foo_messages' => xxx, 'foo_OK_count' => ... }
+    
+    <match accesslog.baz>
+      type datacounter
+      count_key status
+      pattern1 OK ^2\d\d$
+      pattern2 NG ^\d\d\d$
+      input_tag_remove_prefix accesslog
+      output_per_tag yes
+      add_prefix datacount
+      output_messages yes
+    </match>
+    # => tag: 'datacount.baz'
+    #    message: {'messages' => xxx, 'OK_count' => ...}
+
 == TODO
 
 - consider what to do next
