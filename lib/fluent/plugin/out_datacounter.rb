@@ -12,6 +12,7 @@ class Fluent::DataCounterOutput < Fluent::Output
   config_param :input_tag_remove_prefix, :string, :default => nil
   config_param :count_key, :string
   config_param :outcast_unmatched, :bool, :default => false
+  config_param :output_messages, :bool, :default => false
 
   # pattern0 reserved as unmatched counts
   config_param :pattern1, :string # string: NAME REGEXP
@@ -126,83 +127,49 @@ class Fluent::DataCounterOutput < Fluent::Output
     tag
   end
 
-  def generate_output(counts, step)
-    output = {}
-    if @aggregate == :all
-      # index 0 is unmatched
-      sum = if @outcast_unmatched
-              counts['all'][1..-1].inject(:+)
-            else
-              counts['all'].inject(:+)
-            end
-      counts['all'].each_with_index do |count,i|
-        name = @patterns[i][1]
-        output[name + '_count'] = count
-        output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        unless i == 0 and @outcast_unmatched
-          output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
-        end
+  def generate_fields(step, target_counts, attr_prefix, output)
+    sum = if @outcast_unmatched
+            target_counts[1..-1].inject(:+)
+          else
+            target_counts.inject(:+)
+          end
+    messages = sum + (@outcast_unmatched ? target_counts[0] : 0)
+
+    target_counts.each_with_index do |count,i|
+      name = @patterns[i][1]
+      output[attr_prefix + name + '_count'] = count
+      output[attr_prefix + name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
+      unless i == 0 and @outcast_unmatched
+        output[attr_prefix + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
       end
-      return output
+      if @output_messages
+        output['messages'] = messages
+      end
     end
 
+    output
+  end
+
+  def generate_output(counts, step)
+    if @aggregate == :all
+      return generate_fields(step, counts['all'], '', {})
+    end
+
+    output = {}
     counts.keys.each do |tag|
-      t = stripped_tag(tag)
-      sum = if @outcast_unmatched
-              counts[tag][1..-1].inject(:+)
-            else
-              counts[tag].inject(:+)
-            end
-      counts[tag].each_with_index do |count,i|
-        name = @patterns[i][1]
-        output[t + '_' + name + '_count'] = count
-        output[t + '_' + name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        unless i == 0 and @outcast_unmatched
-          output[t + '_' + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
-        end
-      end
+      generate_fields(step, counts[tag], stripped_tag(tag) + '_', output)
     end
     output
   end
 
   def generate_output_per_tags(counts, step)
     if @aggregate == :all
-      output = {}
-      # index 0 is unmatched
-      sum = if @outcast_unmatched
-              counts['all'][1..-1].inject(:+)
-            else
-              counts['all'].inject(:+)
-            end
-      counts['all'].each_with_index do |count,i|
-        name = @patterns[i][1]
-        output[name + '_count'] = count
-        output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        unless i == 0 and @outcast_unmatched
-          output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
-        end
-      end
-      return {'all' => output}
+      return {'all' => generate_fields(step, counts['all'], '', {})}
     end
 
     output_pairs = {}
     counts.keys.each do |tag|
-      output = {}
-      t = stripped_tag(tag)
-      sum = if @outcast_unmatched
-              counts[tag][1..-1].inject(:+)
-            else
-              counts[tag].inject(:+)
-            end
-      counts[tag].each_with_index do |count,i|
-        name = @patterns[i][1]
-        output[name + '_count'] = count
-        output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
-        unless i == 0 and @outcast_unmatched
-          output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
-        end
-      end
-      output_pairs[t] = output
+      output_pairs[stripped_tag(tag)] = generate_fields(step, counts[tag], '', {})
     end
     output_pairs
   end

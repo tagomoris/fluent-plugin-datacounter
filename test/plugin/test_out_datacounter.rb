@@ -27,6 +27,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     pattern2 status3xx ^3\\d\\d$
     pattern3 status4xx ^4\\d\\d$
     pattern4 status5xx ^5\\d\\d$
+    output_messages yes
   ]
 
   def create_driver(conf = CONFIG, tag='test.input')
@@ -110,9 +111,11 @@ class DataCounterOutputTest < Test::Unit::TestCase
       count_key field
       pattern1 ok ^2\\d\\d$
       outcast_unmatched yes
+      output_messages yes
     ]
     assert_equal 30, d.instance.tick
     assert_equal true, d.instance.outcast_unmatched
+    assert_equal true, d.instance.output_messages
   end
 
   def test_configure_output_per_tag
@@ -120,6 +123,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
 
     assert_equal true, d.instance.output_per_tag
     assert_equal 'd', d.instance.tag_prefix
+    assert_equal true, d.instance.output_messages
 
     x_CONFIG_OUTPUT_PER_TAG_WITHOUT_TAG_PREFIX = %[
    unit minute
@@ -213,10 +217,25 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal  240, r2['hoge_count']
     assert_equal  4.0, r2['hoge_rate']
     assert_equal 80.0, r2['hoge_percentage']
+
+    d = create_driver %[
+      aggregate all
+      count_key field
+      pattern1 hoge xxx\d\d
+      output_messages yes
+    ]
+    r2 = d.instance.generate_output({'all' => [60,240]}, 60)
+    assert_equal   60, r2['unmatched_count']
+    assert_equal  1.0, r2['unmatched_rate']
+    assert_equal 20.0, r2['unmatched_percentage']
+    assert_equal  240, r2['hoge_count']
+    assert_equal  4.0, r2['hoge_rate']
+    assert_equal 80.0, r2['hoge_percentage']
+    assert_equal  300, r2['messages']
   end
 
   def test_generate_output_per_tag
-    d = create_driver
+    d = create_driver(CONFIG_OUTPUT_PER_TAG)
     result = d.instance.generate_output_per_tags({'test.input' => [60,240,120,180,0], 'test.input2' => [0,600,0,0,0]}, 60)
     assert_equal   60, result['input']['unmatched_count']
     assert_equal  1.0, result['input']['unmatched_rate']
@@ -233,6 +252,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal    0, result['input']['status5xx_count']
     assert_equal  0.0, result['input']['status5xx_rate']
     assert_equal  0.0, result['input']['status5xx_percentage']
+    assert_equal  600, result['input']['messages']
 
     assert_equal    0, result['input2']['unmatched_count']
     assert_equal  0.0, result['input2']['unmatched_rate']
@@ -249,6 +269,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal    0, result['input2']['status5xx_count']
     assert_equal  0.0, result['input2']['status5xx_rate']
     assert_equal  0.0, result['input2']['status5xx_percentage']
+    assert_equal  600, result['input2']['messages']
 
     d = create_driver %[
       aggregate all
@@ -341,6 +362,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       count_key target
       pattern1 ok 2\\d\\d
       pattern2 redirect 3\\d\\d
+      output_messages yes
     ], 'test.tag2')
     d2.run do
       60.times do
@@ -362,6 +384,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 0, data[2]['unmatched_count']
     assert_equal 0.0, data[2]['unmatched_rate']
     assert_equal 0.0, data[2]['unmatched_percentage']
+    assert_equal 120, data[2]['messages']
 
     d3 = create_driver(%[
       count_key target
@@ -395,6 +418,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern1 ok 2\\d\\d
       pattern2 redirect 3\\d\\d
       outcast_unmatched true
+      output_messages true
     ], 'test.tag2')
     d3.run do
       60.times do
@@ -414,6 +438,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 50.0, data[2]['ok_percentage']
     assert_equal 60, data[2]['redirect_count']
     assert_equal 50.0, data[2]['redirect_percentage']
+    assert_equal 180, data[2]['messages']
   end
 
   def test_emit_output_per_tag
@@ -447,6 +472,8 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 0, r['status5xx_count']
     assert_equal 0.0, r['status5xx_rate']
     assert_equal 0.0, r['status5xx_percentage']
+
+    assert_equal 240, r['messages']
 
     d2 = create_driver(%[
       aggregate all
