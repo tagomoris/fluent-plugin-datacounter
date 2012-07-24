@@ -143,7 +143,7 @@ class Fluent::DataCounterOutput < Fluent::Output
         output[attr_prefix + name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
       end
       if @output_messages
-        output['messages'] = messages
+        output[attr_prefix + 'messages'] = messages
       end
     end
 

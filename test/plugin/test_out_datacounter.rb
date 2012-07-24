@@ -204,6 +204,13 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal    0, r1['input2_status5xx_count']
     assert_equal  0.0, r1['input2_status5xx_rate']
     assert_equal  0.0, r1['input2_status5xx_percentage']
+    assert_nil r1['input_messages']
+    assert_nil r1['input2_messages']
+
+    d = create_driver (CONFIG + "\n output_messages true\n")
+    r1 = d.instance.generate_output({'test.input' => [60,240,120,180,0], 'test.input2' => [0,600,0,0,0]}, 60)
+    assert_equal  600, r1['input_messages']
+    assert_equal  600, r1['input2_messages']
 
     d = create_driver %[
       aggregate all
