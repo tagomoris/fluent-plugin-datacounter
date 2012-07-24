@@ -5,8 +5,10 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   config_param :count_interval, :time, :default => nil
   config_param :unit, :string, :default => 'minute'
+  config_param :output_per_tag, :bool, :default => false
   config_param :aggregate, :string, :default => 'tag'
   config_param :tag, :string, :default => 'datacount'
+  config_param :tag_prefix, :string, :default => nil
   config_param :input_tag_remove_prefix, :string, :default => nil
   config_param :count_key, :string
   config_param :outcast_unmatched, :bool, :default => false
@@ -46,7 +48,8 @@ class Fluent::DataCounterOutput < Fluent::Output
     @patterns = [[0, 'unmatched', nil]]
     pattern_names = ['unmatched']
 
-    invalids = conf.keys.select{|k| k =~ /^pattern(\d+)$/}.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
+    pattern_keys = conf.keys.select{|k| k =~ /^pattern(\d+)$/}
+    invalids = pattern_keys.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
     if invalids.size > 0
       $log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
     end
@@ -62,6 +65,11 @@ class Fluent::DataCounterOutput < Fluent::Output
     end
     unless @patterns.length == pattern_names.uniq.length
       raise Fluent::ConfigError, "duplicated pattern names"
+    end
+
+    if @output_per_tag
+      raise Fluent::ConfigError, "tag_prefix must be specified with output_per_tag" unless @tag_prefix
+      @tag_prefix_string = @tag_prefix + '.'
     end
 
     if @input_tag_remove_prefix
@@ -157,13 +165,68 @@ class Fluent::DataCounterOutput < Fluent::Output
     output
   end
 
-  def flush(step)
+  def generate_output_per_tags(counts, step)
+    if @aggregate == :all
+      output = {}
+      # index 0 is unmatched
+      sum = if @outcast_unmatched
+              counts['all'][1..-1].inject(:+)
+            else
+              counts['all'].inject(:+)
+            end
+      counts['all'].each_with_index do |count,i|
+        name = @patterns[i][1]
+        output[name + '_count'] = count
+        output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
+        unless i == 0 and @outcast_unmatched
+          output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
+        end
+      end
+      return {'all' => output}
+    end
+
+    output_pairs = {}
+    counts.keys.each do |tag|
+      output = {}
+      t = stripped_tag(tag)
+      sum = if @outcast_unmatched
+              counts[tag][1..-1].inject(:+)
+            else
+              counts[tag].inject(:+)
+            end
+      counts[tag].each_with_index do |count,i|
+        name = @patterns[i][1]
+        output[name + '_count'] = count
+        output[name + '_rate'] = ((count * 100.0) / (1.00 * step)).floor / 100.0
+        unless i == 0 and @outcast_unmatched
+          output[name + '_percentage'] = count * 100.0 / (1.00 * sum) if sum > 0
+        end
+      end
+      output_pairs[t] = output
+    end
+    output_pairs
+  end
+
+  def flush(step) # returns one message
     flushed,@counts = @counts,count_initialized(@counts.keys.dup)
     generate_output(flushed, step)
   end
 
+  def flush_per_tags(step) # returns map of tag - message
+    flushed,@counts = @counts,count_initialized(@counts.keys.dup)
+    generate_output_per_tags(flushed, step)
+  end
+
   def flush_emit(step)
-    Fluent::Engine.emit(@tag, Fluent::Engine.now, flush(step))
+    if @output_per_tag
+      # tag - message maps
+      time = Fluent::Engine.now
+      flush_per_tags(step).each do |tag,message|
+        Fluent::Engine.emit(@tag_prefix_string + tag, time, message)
+      end
+    else
+      Fluent::Engine.emit(@tag, Fluent::Engine.now, flush(step))
+    end
   end
 
   def start_watch

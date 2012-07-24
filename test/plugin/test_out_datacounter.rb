@@ -16,6 +16,19 @@ class DataCounterOutputTest < Test::Unit::TestCase
     pattern4 status5xx ^5\\d\\d$
   ]
 
+  CONFIG_OUTPUT_PER_TAG = %[
+    unit minute
+    aggregate tag
+    output_per_tag yes
+    tag_prefix d
+    input_tag_remove_prefix test
+    count_key target
+    pattern1 status2xx ^2\\d\\d$
+    pattern2 status3xx ^3\\d\\d$
+    pattern3 status4xx ^4\\d\\d$
+    pattern4 status5xx ^5\\d\\d$
+  ]
+
   def create_driver(conf = CONFIG, tag='test.input')
     Fluent::Test::OutputTestDriver.new(Fluent::DataCounterOutput, tag).configure(conf)
   end
@@ -102,6 +115,28 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal true, d.instance.outcast_unmatched
   end
 
+  def test_configure_output_per_tag
+    d = create_driver(CONFIG_OUTPUT_PER_TAG)
+
+    assert_equal true, d.instance.output_per_tag
+    assert_equal 'd', d.instance.tag_prefix
+
+    x_CONFIG_OUTPUT_PER_TAG_WITHOUT_TAG_PREFIX = %[
+   unit minute
+   aggregate tag
+   output_per_tag yes
+   input_tag_remove_prefix test
+   count_key target
+   pattern1 status2xx ^2\\d\\d$
+   pattern2 status3xx ^3\\d\\d$
+   pattern3 status4xx ^4\\d\\d$
+   pattern4 status5xx ^5\\d\\d$
+    ]
+    assert_raise(Fluent::ConfigError) {
+      d = create_driver(x_CONFIG_OUTPUT_PER_TAG_WITHOUT_TAG_PREFIX)
+    }
+  end
+
   def test_count_initialized
     d = create_driver %[
       aggregate all
@@ -178,6 +213,58 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal  240, r2['hoge_count']
     assert_equal  4.0, r2['hoge_rate']
     assert_equal 80.0, r2['hoge_percentage']
+  end
+
+  def test_generate_output_per_tag
+    d = create_driver
+    result = d.instance.generate_output_per_tags({'test.input' => [60,240,120,180,0], 'test.input2' => [0,600,0,0,0]}, 60)
+    assert_equal   60, result['input']['unmatched_count']
+    assert_equal  1.0, result['input']['unmatched_rate']
+    assert_equal 10.0, result['input']['unmatched_percentage']
+    assert_equal  240, result['input']['status2xx_count']
+    assert_equal  4.0, result['input']['status2xx_rate']
+    assert_equal 40.0, result['input']['status2xx_percentage']
+    assert_equal  120, result['input']['status3xx_count']
+    assert_equal  2.0, result['input']['status3xx_rate']
+    assert_equal 20.0, result['input']['status3xx_percentage']
+    assert_equal  180, result['input']['status4xx_count']
+    assert_equal  3.0, result['input']['status4xx_rate']
+    assert_equal 30.0, result['input']['status4xx_percentage']
+    assert_equal    0, result['input']['status5xx_count']
+    assert_equal  0.0, result['input']['status5xx_rate']
+    assert_equal  0.0, result['input']['status5xx_percentage']
+
+    assert_equal    0, result['input2']['unmatched_count']
+    assert_equal  0.0, result['input2']['unmatched_rate']
+    assert_equal  0.0, result['input2']['unmatched_percentage']
+    assert_equal  600, result['input2']['status2xx_count']
+    assert_equal 10.0, result['input2']['status2xx_rate']
+    assert_equal 100.0, result['input2']['status2xx_percentage']
+    assert_equal    0, result['input2']['status3xx_count']
+    assert_equal  0.0, result['input2']['status3xx_rate']
+    assert_equal  0.0, result['input2']['status3xx_percentage']
+    assert_equal    0, result['input2']['status4xx_count']
+    assert_equal  0.0, result['input2']['status4xx_rate']
+    assert_equal  0.0, result['input2']['status4xx_percentage']
+    assert_equal    0, result['input2']['status5xx_count']
+    assert_equal  0.0, result['input2']['status5xx_rate']
+    assert_equal  0.0, result['input2']['status5xx_percentage']
+
+    d = create_driver %[
+      aggregate all
+      count_key field
+      pattern1 hoge xxx\d\d
+      output_per_tag yes
+      tag_prefix d
+    ]
+    r = d.instance.generate_output_per_tags({'all' => [60,240]}, 60)
+    assert_equal 1, r.keys.size
+    assert_equal   60, r['all']['unmatched_count']
+    assert_equal  1.0, r['all']['unmatched_rate']
+    assert_equal 20.0, r['all']['unmatched_percentage']
+    assert_equal  240, r['all']['hoge_count']
+    assert_equal  4.0, r['all']['hoge_rate']
+    assert_equal 80.0, r['all']['hoge_percentage']
   end
 
   def test_pattern_num
@@ -321,6 +408,124 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 1, emits.length
     data = emits[0]
     assert_equal 'datacount', data[0] # tag
+    assert_equal 60, data[2]['unmatched_count']
+    assert_nil data[2]['unmatched_percentage']
+    assert_equal 60, data[2]['ok_count']
+    assert_equal 50.0, data[2]['ok_percentage']
+    assert_equal 60, data[2]['redirect_count']
+    assert_equal 50.0, data[2]['redirect_percentage']
+  end
+
+  def test_emit_output_per_tag
+    d1 = create_driver(CONFIG_OUTPUT_PER_TAG, 'test.tag1')
+    d1.run do
+      60.times do
+        d1.emit({'target' => '200'})
+        d1.emit({'target' => '100'})
+        d1.emit({'target' => '200'})
+        d1.emit({'target' => '400'})
+      end
+    end
+    r1 = d1.instance.flush_per_tags(60)
+    assert_equal 1, r1.keys.size
+    r = r1['tag1']
+    assert_equal 120, r['status2xx_count']
+    assert_equal 2.0, r['status2xx_rate']
+    assert_equal 50.0, r['status2xx_percentage']
+
+    assert_equal 60, r['status4xx_count']
+    assert_equal 1.0, r['status4xx_rate']
+    assert_equal 25.0, r['status4xx_percentage']
+    
+    assert_equal 60, r['unmatched_count']
+    assert_equal 1.0, r['unmatched_rate']
+    assert_equal 25.0, r['unmatched_percentage']
+    
+    assert_equal 0, r['status3xx_count']
+    assert_equal 0.0, r['status3xx_rate']
+    assert_equal 0.0, r['status3xx_percentage']
+    assert_equal 0, r['status5xx_count']
+    assert_equal 0.0, r['status5xx_rate']
+    assert_equal 0.0, r['status5xx_percentage']
+
+    d2 = create_driver(%[
+      aggregate all
+      count_key target
+      pattern1 ok 2\\d\\d
+      pattern2 redirect 3\\d\\d
+      output_per_tag yes
+      tag_prefix d
+    ], 'test.tag2')
+    d2.run do
+      60.times do
+        d2.emit({'target' => '200'})
+        d2.emit({'target' => '300 200'})
+      end
+    end
+    d2.instance.flush_emit(120)
+    emits = d2.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'd.all', data[0] # tag
+    assert_equal 120, data[2]['ok_count']
+    assert_equal 1.0, data[2]['ok_rate']
+    assert_equal 100.0, data[2]['ok_percentage']
+    assert_equal 0, data[2]['redirect_count']
+    assert_equal 0.0, data[2]['redirect_rate']
+    assert_equal 0.0, data[2]['redirect_percentage']
+    assert_equal 0, data[2]['unmatched_count']
+    assert_equal 0.0, data[2]['unmatched_rate']
+    assert_equal 0.0, data[2]['unmatched_percentage']
+
+    d3 = create_driver(%[
+      count_key target
+      input_tag_remove_prefix test
+      pattern1 ok 2\\d\\d
+      pattern2 redirect 3\\d\\d
+      outcast_unmatched yes
+      output_per_tag yes
+      tag_prefix d
+    ], 'test.tag2')
+    d3.run do
+      60.times do
+        d3.emit({'target' => '200'})
+        d3.emit({'target' => '300'})
+        d3.emit({'target' => '400'})
+      end
+    end
+    d3.instance.flush_emit(180)
+    emits = d3.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'd.tag2', data[0] # tag
+    assert_equal 60, data[2]['unmatched_count']
+    assert_nil data[2]['unmatched_percentage']
+    assert_equal 60, data[2]['ok_count']
+    assert_equal 50.0, data[2]['ok_percentage']
+    assert_equal 60, data[2]['redirect_count']
+    assert_equal 50.0, data[2]['redirect_percentage']
+
+    d3 = create_driver(%[
+      aggregate all
+      count_key target
+      pattern1 ok 2\\d\\d
+      pattern2 redirect 3\\d\\d
+      outcast_unmatched true
+      output_per_tag yes
+      tag_prefix ddd
+    ], 'test.tag2')
+    d3.run do
+      60.times do
+        d3.emit({'target' => '200'})
+        d3.emit({'target' => '300'})
+        d3.emit({'target' => '400'})
+      end
+    end
+    d3.instance.flush_emit(180)
+    emits = d3.emits
+    assert_equal 1, emits.length
+    data = emits[0]
+    assert_equal 'ddd.all', data[0] # tag
     assert_equal 60, data[2]['unmatched_count']
     assert_nil data[2]['unmatched_percentage']
     assert_equal 60, data[2]['ok_count']
