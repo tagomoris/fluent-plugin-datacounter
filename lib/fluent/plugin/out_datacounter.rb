@@ -95,11 +95,12 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   def count_initialized(keys=nil)
     # counts['tag'][num] = count
+    # counts['tag'][-1] = sum
     if @aggregate == :all
-      {'all' => ([0] * @patterns.length)}
+      {'all' => ([0] * (@patterns.length + 1))}
     elsif keys
       values = Array.new(keys.length) {|i|
-        Array.new(@patterns.length){|j| 0 }
+        Array.new(@patterns.length + 1){|j| 0 }
       }
       Hash[[keys, values].transpose]
     else
@@ -113,10 +114,13 @@ class Fluent::DataCounterOutput < Fluent::Output
     end
     
     @mutex.synchronize {
-      @counts[tag] ||= [0] * @patterns.length
+      @counts[tag] ||= [0] * (@patterns.length + 1)
+      sum = 0
       counts.each_with_index do |count, i|
+        sum += count
         @counts[tag][i] += count
       end
+      @counts[tag][-1] += sum
     }
   end
 
@@ -129,11 +133,11 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   def generate_fields(step, target_counts, attr_prefix, output)
     sum = if @outcast_unmatched
-            target_counts[1..-1].inject(:+)
+            target_counts[1..-2].inject(:+)
           else
-            target_counts.inject(:+)
+            target_counts[-1]
           end
-    messages = sum + (@outcast_unmatched ? target_counts[0] : 0)
+    messages = target_counts.delete_at(-1)
 
     target_counts.each_with_index do |count,i|
       name = @patterns[i][1]

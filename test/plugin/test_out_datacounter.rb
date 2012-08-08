@@ -148,7 +148,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern1 hoge 1\d\d
       pattern2 moge 2\d\d
     ]
-    assert_equal [0,0,0], d.instance.counts['all']
+    assert_equal [0,0,0,0], d.instance.counts['all']
   end
 
   def test_countups
@@ -156,11 +156,11 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_nil d.instance.counts['test.input']
 
     d.instance.countups('test.input', [0, 0, 0, 0, 0])
-    assert_equal [0,0,0,0,0], d.instance.counts['test.input']
+    assert_equal [0,0,0,0,0,0], d.instance.counts['test.input']
     d.instance.countups('test.input', [1, 1, 1, 0, 0])
-    assert_equal [1,1,1,0,0], d.instance.counts['test.input']
+    assert_equal [1,1,1,0,0,3], d.instance.counts['test.input']
     d.instance.countups('test.input', [0, 5, 1, 0, 0])
-    assert_equal [1,6,2,0,0], d.instance.counts['test.input']
+    assert_equal [1,6,2,0,0,9], d.instance.counts['test.input']
   end
 
   def test_stripped_tag
@@ -172,7 +172,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
 
   def test_generate_output
     d = create_driver
-    r1 = d.instance.generate_output({'test.input' => [60,240,120,180,0], 'test.input2' => [0,600,0,0,0]}, 60)
+    r1 = d.instance.generate_output({'test.input' => [60,240,120,180,0,600], 'test.input2' => [0,600,0,0,0,600]}, 60)
     assert_equal   60, r1['input_unmatched_count']
     assert_equal  1.0, r1['input_unmatched_rate']
     assert_equal 10.0, r1['input_unmatched_percentage']
@@ -208,7 +208,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_nil r1['input2_messages']
 
     d = create_driver (CONFIG + "\n output_messages true\n")
-    r1 = d.instance.generate_output({'test.input' => [60,240,120,180,0], 'test.input2' => [0,600,0,0,0]}, 60)
+    r1 = d.instance.generate_output({'test.input' => [60,240,120,180,0,600], 'test.input2' => [0,600,0,0,0,600]}, 60)
     assert_equal  600, r1['input_messages']
     assert_equal  600, r1['input2_messages']
 
@@ -217,7 +217,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       count_key field
       pattern1 hoge xxx\d\d
     ]
-    r2 = d.instance.generate_output({'all' => [60,240]}, 60)
+    r2 = d.instance.generate_output({'all' => [60,240,300]}, 60)
     assert_equal   60, r2['unmatched_count']
     assert_equal  1.0, r2['unmatched_rate']
     assert_equal 20.0, r2['unmatched_percentage']
@@ -231,7 +231,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern1 hoge xxx\d\d
       output_messages yes
     ]
-    r2 = d.instance.generate_output({'all' => [60,240]}, 60)
+    r2 = d.instance.generate_output({'all' => [60,240,300]}, 60)
     assert_equal   60, r2['unmatched_count']
     assert_equal  1.0, r2['unmatched_rate']
     assert_equal 20.0, r2['unmatched_percentage']
@@ -243,7 +243,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
 
   def test_generate_output_per_tag
     d = create_driver(CONFIG_OUTPUT_PER_TAG)
-    result = d.instance.generate_output_per_tags({'test.input' => [60,240,120,180,0], 'test.input2' => [0,600,0,0,0]}, 60)
+    result = d.instance.generate_output_per_tags({'test.input' => [60,240,120,180,0,600], 'test.input2' => [0,600,0,0,0,600]}, 60)
     assert_equal   60, result['input']['unmatched_count']
     assert_equal  1.0, result['input']['unmatched_rate']
     assert_equal 10.0, result['input']['unmatched_percentage']
@@ -285,7 +285,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       output_per_tag yes
       tag_prefix d
     ]
-    r = d.instance.generate_output_per_tags({'all' => [60,240]}, 60)
+    r = d.instance.generate_output_per_tags({'all' => [60,240,300]}, 60)
     assert_equal 1, r.keys.size
     assert_equal   60, r['all']['unmatched_count']
     assert_equal  1.0, r['all']['unmatched_rate']
