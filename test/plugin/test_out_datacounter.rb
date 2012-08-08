@@ -567,4 +567,90 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 60, data[2]['redirect_count']
     assert_equal 50.0, data[2]['redirect_percentage']
   end
+
+  def test_zero_tags
+    fields = ['unmatched','status2xx','status3xx','status4xx','status5xx'].map{|k| 'tag1_' + k}.map{|p|
+      ['count', 'rate', 'percentage'].map{|a| p + '_' + a}
+    }.flatten
+    fields_without_percentage = ['unmatched','status2xx','status3xx','status4xx','status5xx'].map{|k| 'tag1_' + k}.map{|p|
+      ['count', 'rate'].map{|a| p + '_' + a}
+    }.flatten
+
+    d = create_driver(CONFIG, 'test.tag1')
+    # CONFIG = %[
+    #   unit minute
+    #   aggregate tag
+    #   input_tag_remove_prefix test
+    #   count_key target
+    #   pattern1 status2xx ^2\\d\\d$
+    #   pattern2 status3xx ^3\\d\\d$
+    #   pattern3 status4xx ^4\\d\\d$
+    #   pattern4 status5xx ^5\\d\\d$
+    # ]
+    d.run do
+      60.times do
+        d.emit({'target' => '200'})
+        d.emit({'target' => '100'})
+        d.emit({'target' => '200'})
+        d.emit({'target' => '400'})
+      end
+    end
+    d.instance.flush_emit(60)
+    assert_equal 1, d.emits.size
+    r1 = d.emits[0][2]
+    assert_equal fields, r1.keys
+
+    d.instance.flush_emit(60)
+    assert_equal 2, d.emits.size # +1
+    r2 = d.emits[1][2]
+    assert_equal fields_without_percentage, r2.keys
+    assert_equal [0]*10, r2.values
+
+    d.instance.flush_emit(60)
+    assert_equal 2, d.emits.size # +0
+  end
+  def test_zer_tags_per_tag
+    fields = (['unmatched','status2xx','status3xx','status4xx','status5xx'].map{|p|
+      ['count', 'rate', 'percentage'].map{|a| p + '_' + a}
+    }.flatten + ['messages']).sort
+    fields_without_percentage = (['unmatched','status2xx','status3xx','status4xx','status5xx'].map{|p|
+      ['count', 'rate'].map{|a| p + '_' + a}
+    }.flatten + ['messages']).sort
+
+    d = create_driver(CONFIG_OUTPUT_PER_TAG, 'test.tag1')
+    # CONFIG_OUTPUT_PER_TAG = %[
+    #   unit minute
+    #   aggregate tag
+    #   output_per_tag yes
+    #   tag_prefix d
+    #   input_tag_remove_prefix test
+    #   count_key target
+    #   pattern1 status2xx ^2\\d\\d$
+    #   pattern2 status3xx ^3\\d\\d$
+    #   pattern3 status4xx ^4\\d\\d$
+    #   pattern4 status5xx ^5\\d\\d$
+    #   output_messages yes
+    # ]
+    d.run do
+      60.times do
+        d.emit({'target' => '200'})
+        d.emit({'target' => '100'})
+        d.emit({'target' => '200'})
+        d.emit({'target' => '400'})
+      end
+    end
+    d.instance.flush_emit(60)
+    assert_equal 1, d.emits.size
+    r1 = d.emits[0][2]
+    assert_equal fields, r1.keys.sort
+
+    d.instance.flush_emit(60)
+    assert_equal 2, d.emits.size # +1
+    r2 = d.emits[1][2]
+    assert_equal fields_without_percentage, r2.keys.sort
+    assert_equal [0]*11, r2.values # (_count, _rate)x5 + messages
+
+    d.instance.flush_emit(60)
+    assert_equal 2, d.emits.size # +0
+  end
 end

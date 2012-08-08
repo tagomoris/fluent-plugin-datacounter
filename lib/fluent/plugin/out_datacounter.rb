@@ -179,12 +179,12 @@ class Fluent::DataCounterOutput < Fluent::Output
   end
 
   def flush(step) # returns one message
-    flushed,@counts = @counts,count_initialized(@counts.keys.dup)
+    flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
     generate_output(flushed, step)
   end
 
   def flush_per_tags(step) # returns map of tag - message
-    flushed,@counts = @counts,count_initialized(@counts.keys.dup)
+    flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
     generate_output_per_tags(flushed, step)
   end
 
@@ -196,7 +196,10 @@ class Fluent::DataCounterOutput < Fluent::Output
         Fluent::Engine.emit(@tag_prefix_string + tag, time, message)
       end
     else
-      Fluent::Engine.emit(@tag, Fluent::Engine.now, flush(step))
+      message = flush(step)
+      if message.keys.size > 0
+        Fluent::Engine.emit(@tag, Fluent::Engine.now, message)
+      end
     end
   end
 
