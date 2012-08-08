@@ -3,7 +3,7 @@ $:.push File.expand_path("../lib", __FILE__)
 
 Gem::Specification.new do |s|
   s.name        = "fluent-plugin-datacounter"
-  s.version     = "0.3.0"
+  s.version     = "0.3.1"
   s.authors     = ["TAGOMORI Satoshi"]
   s.email       = ["tagomoris@gmail.com"]
   s.homepage    = "https://github.com/tagomoris/fluent-plugin-datacounter"
