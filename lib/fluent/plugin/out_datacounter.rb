@@ -225,6 +225,8 @@ class Fluent::DataCounterOutput < Fluent::Output
     c = [0] * @patterns.length
 
     es.each do |time,record|
+      alist = record.map{|key,value| [key.to_s, value] }
+      record = Hash[*alist.flatten]
       value = record[@count_key]
       next if value.nil?
 
