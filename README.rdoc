@@ -85,7 +85,7 @@ With 'output_per_tag' option and 'tag_prefix', we get one result message for one
       pattern2 NG ^\d\d\d$
       input_tag_remove_prefix accesslog
       output_per_tag yes
-      add_prefix status
+      tag_prefix status
     </match>
     # => tag: 'status.foo' or 'status.bar'
     #    message: {'OK_count' => 60, 'OK_rate' => 1.0, 'OK_percentage' => 70, 'NG_count' => , ....}
@@ -110,7 +110,7 @@ And you can get tested messages count with 'output_messages' option:
       pattern2 NG ^\d\d\d$
       input_tag_remove_prefix accesslog
       output_per_tag yes
-      add_prefix datacount
+      tag_prefix datacount
       output_messages yes
     </match>
     # => tag: 'datacount.baz'
