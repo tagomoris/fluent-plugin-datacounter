@@ -3,7 +3,7 @@ $:.push File.expand_path("../lib", __FILE__)
 
 Gem::Specification.new do |s|
   s.name        = "fluent-plugin-datacounter"
-  s.version     = "0.4.0"
+  s.version     = "0.4.1"
   s.authors     = ["TAGOMORI Satoshi"]
   s.email       = ["tagomoris@gmail.com"]
   s.homepage    = "https://github.com/tagomoris/fluent-plugin-datacounter"
@@ -18,6 +18,5 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_development_dependency "rake"
-  s.add_development_dependency "fluentd"
   s.add_runtime_dependency "fluentd"
 end
