@@ -13,6 +13,7 @@ class Fluent::DataCounterOutput < Fluent::Output
   config_param :count_key, :string
   config_param :outcast_unmatched, :bool, :default => false
   config_param :output_messages, :bool, :default => false
+  config_param :store_file, :string, :default => nil
 
   # pattern0 reserved as unmatched counts
   config_param :pattern1, :string # string: NAME REGEXP
@@ -78,12 +79,20 @@ class Fluent::DataCounterOutput < Fluent::Output
       @removed_length = @removed_prefix_string.length
     end
 
+    if @store_file
+      f = Pathname.new(@store_file)
+      if (f.exist? && !f.writable_real?) || (!f.exist? && !f.parent.writable_real?)
+        raise Fluent::ConfigError, "#{@store_file} is not writable"
+      end
+    end
+
     @counts = count_initialized
     @mutex = Mutex.new
   end
 
   def start
     super
+    load_from_file
     start_watch
   end
 
@@ -91,6 +100,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     super
     @watcher.terminate
     @watcher.join
+    store_to_file
   end
 
   def count_initialized(keys=nil)
@@ -242,4 +252,42 @@ class Fluent::DataCounterOutput < Fluent::Output
 
     chain.next
   end
+
+  def store_to_file
+    return unless @store_file
+
+    begin
+      Pathname.new(@store_file).open('wb') do |f|
+        Marshal.dump({
+          :counts           => @counts,
+          :aggregate        => @aggregate,
+          :count_key        => @count_key,
+          :patterns         => @patterns,
+        }, f)
+      end
+    rescue => e
+      $log.warn "out_datacounter: Can't write store_file #{e.class} #{e.message}"
+    end
+  end
+
+  def load_from_file
+    return unless @store_file
+    return unless (f = Pathname.new(@store_file)).exist?
+
+    begin
+      f.open('rb') do |f|
+        stored = Marshal.load(f)
+        if stored[:aggregate] == @aggregate and
+          stored[:count_key] == @count_key and
+          stored[:patterns]  == @patterns
+          @counts = stored[:counts]
+        else
+          $log.warn "out_datacounter: configuration param was changed. ignore stored data"
+        end
+      end
+    rescue => e
+      $log.warn "out_datacounter: Can't load store_file #{e.class} #{e.message}"
+    end
+  end
+
 end
