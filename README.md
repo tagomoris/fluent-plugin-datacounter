@@ -116,6 +116,53 @@ And you can get tested messages count with 'output_messages' option:
     # => tag: 'datacount.baz'
     #    message: {'messages' => xxx, 'OK_count' => ...}
 
+## Parameters
+
+* count\_key (required)
+
+    The key to count in the event record.
+
+* tag
+
+    The output tag. Default is `datacount`.
+
+* tag\_prefix
+
+    The prefix string which will be added to the input tag. `output_per_tag yes` must be specified together. 
+
+* input\_tag\_remove\_prefix
+
+    The prefix string which will be removed from the input tag.
+
+* count\_interval
+
+    The interval time to count in seconds. Default is `60`.
+
+* unit
+
+    The interval time to monitor specified an unit (either of `minute`, `hour`, or `day`).
+    Use either of `count_interval` or `unit`.
+
+* aggregate
+
+    Calculate in each input `tag` separetely, or `all` records in a mass. Default is `tag`.
+
+* ouput\_per\_tag
+
+    Emit for each input tag. `tag_prefix` must be specified together. Default is `no`.
+
+* outcast\_unmatched
+
+    Specify `yes` if you do not want to include 'unmatched' counts into percentage. Default is `no`.
+
+* output\_messages
+
+    Specify `yes` if you want to get tested messages. Default is `no`.
+
+* store\_file
+
+    Store internal data into a file of the given path on shutdown, and load on starting.
+
 ## TODO
 
 - consider what to do next
