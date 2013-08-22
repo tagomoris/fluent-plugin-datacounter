@@ -23,6 +23,7 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   attr_accessor :tick
   attr_accessor :counts
+  attr_accessor :passed_time
   attr_accessor :last_checked
 
   def configure(conf)
@@ -221,6 +222,8 @@ class Fluent::DataCounterOutput < Fluent::Output
   def watch
     # instance variable, and public accessable, for test
     @last_checked = Fluent::Engine.now
+    # skip the passed time when loading @counts form file
+    @last_checked -= @passed_time if @passed_time
     while true
       sleep 0.5
       if Fluent::Engine.now - @last_checked >= @tick
@@ -258,8 +261,10 @@ class Fluent::DataCounterOutput < Fluent::Output
 
     begin
       Pathname.new(@store_file).open('wb') do |f|
+        @passed_time = Fluent::Engine.now - @last_checked
         Marshal.dump({
           :counts           => @counts,
+          :passed_time      => @passed_time,
           :aggregate        => @aggregate,
           :count_key        => @count_key,
           :patterns         => @patterns,
@@ -281,6 +286,7 @@ class Fluent::DataCounterOutput < Fluent::Output
           stored[:count_key] == @count_key and
           stored[:patterns]  == @patterns
           @counts = stored[:counts]
+          @passed_time = stored[:passed_time]
         else
           $log.warn "out_datacounter: configuration param was changed. ignore stored data"
         end

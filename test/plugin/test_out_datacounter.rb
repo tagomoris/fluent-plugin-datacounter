@@ -670,20 +670,25 @@ class DataCounterOutputTest < Test::Unit::TestCase
       d.instance.shutdown
     end
     stored_counts = d.instance.counts
+    stored_passed_time = d.instance.passed_time
     assert File.exist? file
 
     # test load
     d = create_driver(CONFIG + %[store_file #{file}])
     d.run do
       loaded_counts = d.instance.counts
+      loaded_passed_time = d.instance.passed_time
       assert_equal stored_counts, loaded_counts
+      assert_equal stored_passed_time, loaded_passed_time
     end
 
     # test not to load if config is changed
     d = create_driver(CONFIG + %[count_key foobar store_file #{file}])
     d.run do
       loaded_counts = d.instance.counts
+      loaded_passed_time = d.instance.passed_time
       assert_equal({}, loaded_counts)
+      assert_equal(nil, loaded_passed_time)
     end
 
     File.unlink file
