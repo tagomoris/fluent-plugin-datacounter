@@ -1,8 +1,8 @@
-= fluent-plugin-datacounter
+# fluent-plugin-datacounter
 
-== Component
+## Component
 
-=== DataCounterOutput
+### DataCounterOutput
 
 Count messages with data matches any of specified regexp patterns in specified attribute.
 
@@ -17,9 +17,9 @@ DataCounterOutput emits messages contains results data, so you can output these 
 
 'input_tag_remove_prefix' option available if you want to remove tag prefix from output field names.
 
-== Configuration
+## Configuration
 
-=== DataCounterOutput
+### DataCounterOutput
 
 Count messages that have attribute 'referer' as 'google.com', 'yahoo.com' and 'facebook.com' from all messages matched, per minutes.
 
@@ -116,12 +116,12 @@ And you can get tested messages count with 'output_messages' option:
     # => tag: 'datacount.baz'
     #    message: {'messages' => xxx, 'OK_count' => ...}
 
-== TODO
+## TODO
 
 - consider what to do next
 - patches welcome!
 
-== Copyright
+## Copyright
 
 Copyright:: Copyright (c) 2012- TAGOMORI Satoshi (tagomoris)
 License::   Apache License, Version 2.0
