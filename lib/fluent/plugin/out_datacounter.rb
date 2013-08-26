@@ -34,8 +34,8 @@ class Fluent::DataCounterOutput < Fluent::Output
               when 'minute' then 60
               when 'hour' then 3600
               when 'day' then 86400
-              else 
-                raise RuntimeError, "@unit must be one of minute/hour/day"
+              else
+                raise RuntimeError, "unit must be one of minute/hour/day"
               end
     end
 
@@ -112,7 +112,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     if @aggregate == :all
       tag = 'all'
     end
-    
+
     @mutex.synchronize {
       @counts[tag] ||= [0] * (@patterns.length + 1)
       sum = 0
@@ -179,12 +179,22 @@ class Fluent::DataCounterOutput < Fluent::Output
   end
 
   def flush(step) # returns one message
-    flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+    flushed = @mutex.synchronize do
+      existing_keys = @counts.keys.dup.select{|k| @counts[k][-1] > 0}
+      flushed_tmp = @counts
+      @counts = count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+      flushed_tmp
+    end
     generate_output(flushed, step)
   end
 
   def flush_per_tags(step) # returns map of tag - message
-    flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+    flushed = @mutex.synchronize do
+      existing_keys = @counts.keys.dup.select{|k| @counts[k][-1] > 0}
+      flushed_tmp = @counts
+      @counts = count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+      flushed_tmp
+    end
     generate_output_per_tags(flushed, step)
   end
 
@@ -207,7 +217,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     # for internal, or tests only
     @watcher = Thread.new(&method(:watch))
   end
-  
+
   def watch
     # instance variable, and public accessable, for test
     @last_checked = Fluent::Engine.now
