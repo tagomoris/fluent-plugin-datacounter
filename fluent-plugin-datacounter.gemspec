@@ -9,6 +9,7 @@ Gem::Specification.new do |s|
   s.homepage    = "https://github.com/tagomoris/fluent-plugin-datacounter"
   s.summary     = %q{Output filter plugin to count messages that matches specified conditions}
   s.description = %q{Output filter plugin to count messages that matches specified conditions}
+  s.license     = "APLv2"
 
   s.rubyforge_project = "fluent-plugin-datacounter"
 
