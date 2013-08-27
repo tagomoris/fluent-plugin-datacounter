@@ -1,6 +1,11 @@
 class Fluent::DataCounterOutput < Fluent::Output
   Fluent::Plugin.register_output('datacounter', self)
 
+  def initialize
+    super
+    require 'pathname'
+  end
+
   PATTERN_MAX_NUM = 20
 
   config_param :count_interval, :time, :default => nil
