@@ -98,7 +98,7 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   def start
     super
-    load_from_file
+    load_status(@store_file) if @store_file
     start_watch
   end
 
@@ -106,7 +106,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     super
     @watcher.terminate
     @watcher.join
-    store_to_file
+    save_status(@store_file) if @store_file
   end
 
   def count_initialized(keys=nil)
@@ -261,11 +261,12 @@ class Fluent::DataCounterOutput < Fluent::Output
     chain.next
   end
 
-  def store_to_file
-    return unless @store_file
-
+  # Store internal status into a file
+  #
+  # @param [String] file_path
+  def save_status(file_path)
     begin
-      Pathname.new(@store_file).open('wb') do |f|
+      Pathname.new(file_path).open('wb') do |f|
         @passed_time = Fluent::Engine.now - @last_checked
         Marshal.dump({
           :counts           => @counts,
@@ -280,9 +281,11 @@ class Fluent::DataCounterOutput < Fluent::Output
     end
   end
 
-  def load_from_file
-    return unless @store_file
-    return unless (f = Pathname.new(@store_file)).exist?
+  # Load internal status from a file
+  #
+  # @param [String] file_path
+  def load_status(file_path)
+    return unless (f = Pathname.new(file_path)).exist?
 
     begin
       f.open('rb') do |f|
