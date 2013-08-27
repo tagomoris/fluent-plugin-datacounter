@@ -1,8 +1,8 @@
-= fluent-plugin-datacounter
+# fluent-plugin-datacounter
 
-== Component
+## Component
 
-=== DataCounterOutput
+### DataCounterOutput
 
 Count messages with data matches any of specified regexp patterns in specified attribute.
 
@@ -17,9 +17,9 @@ DataCounterOutput emits messages contains results data, so you can output these 
 
 'input_tag_remove_prefix' option available if you want to remove tag prefix from output field names.
 
-== Configuration
+## Configuration
 
-=== DataCounterOutput
+### DataCounterOutput
 
 Count messages that have attribute 'referer' as 'google.com', 'yahoo.com' and 'facebook.com' from all messages matched, per minutes.
 
@@ -116,12 +116,59 @@ And you can get tested messages count with 'output_messages' option:
     # => tag: 'datacount.baz'
     #    message: {'messages' => xxx, 'OK_count' => ...}
 
-== TODO
+## Parameters
+
+* count\_key (required)
+
+    The key to count in the event record.
+
+* tag
+
+    The output tag. Default is `datacount`.
+
+* tag\_prefix
+
+    The prefix string which will be added to the input tag. `output_per_tag yes` must be specified together. 
+
+* input\_tag\_remove\_prefix
+
+    The prefix string which will be removed from the input tag.
+
+* count\_interval
+
+    The interval time to count in seconds. Default is `60`.
+
+* unit
+
+    The interval time to monitor specified an unit (either of `minute`, `hour`, or `day`).
+    Use either of `count_interval` or `unit`.
+
+* aggregate
+
+    Calculate in each input `tag` separetely, or `all` records in a mass. Default is `tag`.
+
+* ouput\_per\_tag
+
+    Emit for each input tag. `tag_prefix` must be specified together. Default is `no`.
+
+* outcast\_unmatched
+
+    Specify `yes` if you do not want to include 'unmatched' counts into percentage. Default is `no`.
+
+* output\_messages
+
+    Specify `yes` if you want to get tested messages. Default is `no`.
+
+* store\_file
+
+    Store internal data into a file of the given path on shutdown, and load on starting.
+
+## TODO
 
 - consider what to do next
 - patches welcome!
 
-== Copyright
+## Copyright
 
 Copyright:: Copyright (c) 2012- TAGOMORI Satoshi (tagomoris)
 License::   Apache License, Version 2.0

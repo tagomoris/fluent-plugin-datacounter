@@ -653,4 +653,62 @@ class DataCounterOutputTest < Test::Unit::TestCase
     d.instance.flush_emit(60)
     assert_equal 2, d.emits.size # +0
   end
+
+  def test_store_file
+    dir = "test/tmp"
+    Dir.mkdir dir unless Dir.exist? dir
+    file = "#{dir}/test.dat"
+    File.unlink file if File.exist? file
+
+    # test store
+    d = create_driver(CONFIG + %[store_file #{file}])
+    d.run do
+      d.instance.flush_emit(60)
+      d.emit({'target' => 1})
+      d.emit({'target' => 1})
+      d.emit({'target' => 1})
+      d.instance.shutdown
+    end
+    stored_counts = d.instance.counts
+    stored_saved_at = d.instance.saved_at
+    stored_saved_duration = d.instance.saved_duration
+    assert File.exist? file
+
+    # test load
+    d = create_driver(CONFIG + %[store_file #{file}])
+    d.run do
+      loaded_counts = d.instance.counts
+      loaded_saved_at = d.instance.saved_at
+      loaded_saved_duration = d.instance.saved_duration
+      assert_equal stored_counts, loaded_counts
+      assert_equal stored_saved_at, loaded_saved_at
+      assert_equal stored_saved_duration, loaded_saved_duration
+    end
+
+    # test not to load if config is changed
+    d = create_driver(CONFIG + %[count_key foobar store_file #{file}])
+    d.run do
+      loaded_counts = d.instance.counts
+      loaded_saved_at = d.instance.saved_at
+      loaded_saved_duration = d.instance.saved_duration
+      assert_equal({}, loaded_counts)
+      assert_equal(nil, loaded_saved_at)
+      assert_equal(nil, loaded_saved_duration)
+    end
+
+    # test not to load if stored data is outdated.
+    Delorean.jump 61 # jump more than count_interval
+    d = create_driver(CONFIG + %[store_file #{file}])
+    d.run do
+      loaded_counts = d.instance.counts
+      loaded_saved_at = d.instance.saved_at
+      loaded_saved_duration = d.instance.saved_duration
+      assert_equal({}, loaded_counts)
+      assert_equal(nil, loaded_saved_at)
+      assert_equal(nil, loaded_saved_duration)
+    end
+    Delorean.back_to_the_present
+
+    File.unlink file
+  end
 end
