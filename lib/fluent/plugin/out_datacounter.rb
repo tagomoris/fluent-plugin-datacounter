@@ -28,7 +28,8 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   attr_accessor :tick
   attr_accessor :counts
-  attr_accessor :passed_time
+  attr_accessor :saved_duration
+  attr_accessor :saved_at
   attr_accessor :last_checked
 
   def configure(conf)
@@ -98,7 +99,7 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   def start
     super
-    load_status(@store_file) if @store_file
+    load_status(@store_file, @tick) if @store_file
     start_watch
   end
 
@@ -226,9 +227,7 @@ class Fluent::DataCounterOutput < Fluent::Output
   
   def watch
     # instance variable, and public accessable, for test
-    @last_checked = Fluent::Engine.now
-    # skip the passed time when loading @counts form file
-    @last_checked -= @passed_time if @passed_time
+    @last_checked ||= Fluent::Engine.now
     while true
       sleep 0.5
       if Fluent::Engine.now - @last_checked >= @tick
@@ -267,10 +266,12 @@ class Fluent::DataCounterOutput < Fluent::Output
   def save_status(file_path)
     begin
       Pathname.new(file_path).open('wb') do |f|
-        @passed_time = Fluent::Engine.now - @last_checked
+        @saved_at = Fluent::Engine.now
+        @saved_duration = @saved_at - @last_checked
         Marshal.dump({
           :counts           => @counts,
-          :passed_time      => @passed_time,
+          :saved_at        => @saved_at,
+          :saved_duration  => @saved_duration,
           :aggregate        => @aggregate,
           :count_key        => @count_key,
           :patterns         => @patterns,
@@ -284,7 +285,8 @@ class Fluent::DataCounterOutput < Fluent::Output
   # Load internal status from a file
   #
   # @param [String] file_path
-  def load_status(file_path)
+  # @param [Interger] tick The count interval
+  def load_status(file_path, tick)
     return unless (f = Pathname.new(file_path)).exist?
 
     begin
@@ -293,8 +295,17 @@ class Fluent::DataCounterOutput < Fluent::Output
         if stored[:aggregate] == @aggregate and
           stored[:count_key] == @count_key and
           stored[:patterns]  == @patterns
-          @counts = stored[:counts]
-          @passed_time = stored[:passed_time]
+
+          if Fluent::Engine.now <= stored[:saved_at] + tick
+            @counts = stored[:counts]
+            @saved_at = stored[:saved_at]
+            @saved_duration = stored[:saved_duration]
+
+            # skip the saved duration to continue counting
+            @last_checked = Fluent::Engine.now - @saved_duration
+          else
+            $log.warn "out_datacounter: stored data is outdated. ignore stored data"
+          end
         else
           $log.warn "out_datacounter: configuration param was changed. ignore stored data"
         end
