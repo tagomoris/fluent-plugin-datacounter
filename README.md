@@ -1,4 +1,4 @@
-# fluent-plugin-datacounter
+# fluent-plugin-datacounter, a plugin for [Fluentd](http://fluentd.org)
 
 ## Component
 
