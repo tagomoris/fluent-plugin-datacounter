@@ -1,5 +1,7 @@
 # fluent-plugin-datacounter
 
+This is a plugin for [Fluentd](http://fluentd.org)
+
 ## Component
 
 ### DataCounterOutput
