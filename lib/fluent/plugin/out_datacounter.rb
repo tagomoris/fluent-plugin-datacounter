@@ -1,6 +1,11 @@
 class Fluent::DataCounterOutput < Fluent::Output
   Fluent::Plugin.register_output('datacounter', self)
 
+  # Define `log` method for v0.10.42 or earlier
+  unless method_defined?(:log)
+    define_method("log") { $log }
+  end
+
   def initialize
     super
     require 'pathname'
@@ -60,7 +65,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     pattern_keys = conf.keys.select{|k| k =~ /^pattern(\d+)$/}
     invalids = pattern_keys.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
     if invalids.size > 0
-      $log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
+      log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
     end
     (1..PATTERN_MAX_NUM).each do |i|
       next unless conf["pattern#{i}"]
@@ -278,7 +283,7 @@ class Fluent::DataCounterOutput < Fluent::Output
         }, f)
       end
     rescue => e
-      $log.warn "out_datacounter: Can't write store_file #{e.class} #{e.message}"
+      log.warn "out_datacounter: Can't write store_file #{e.class} #{e.message}"
     end
   end
 
@@ -304,14 +309,14 @@ class Fluent::DataCounterOutput < Fluent::Output
             # skip the saved duration to continue counting
             @last_checked = Fluent::Engine.now - @saved_duration
           else
-            $log.warn "out_datacounter: stored data is outdated. ignore stored data"
+            log.warn "out_datacounter: stored data is outdated. ignore stored data"
           end
         else
-          $log.warn "out_datacounter: configuration param was changed. ignore stored data"
+          log.warn "out_datacounter: configuration param was changed. ignore stored data"
         end
       end
     rescue => e
-      $log.warn "out_datacounter: Can't load store_file #{e.class} #{e.message}"
+      log.warn "out_datacounter: Can't load store_file #{e.class} #{e.message}"
     end
   end
 
