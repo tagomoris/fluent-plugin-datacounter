@@ -47,7 +47,7 @@ class Fluent::DataCounterOutput < Fluent::Output
               when 'minute' then 60
               when 'hour' then 3600
               when 'day' then 86400
-              else 
+              else
                 raise RuntimeError, "@unit must be one of minute/hour/day"
               end
     end
@@ -134,7 +134,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     if @aggregate == :all
       tag = 'all'
     end
-    
+
     @mutex.synchronize {
       @counts[tag] ||= [0] * (@patterns.length + 1)
       sum = 0
@@ -229,7 +229,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     # for internal, or tests only
     @watcher = Thread.new(&method(:watch))
   end
-  
+
   def watch
     # instance variable, and public accessable, for test
     @last_checked ||= Fluent::Engine.now
