@@ -201,12 +201,18 @@ class Fluent::DataCounterOutput < Fluent::Output
   end
 
   def flush(step) # returns one message
-    flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+    flushed = nil
+    @mutex.synchronize {
+      flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+    }
     generate_output(flushed, step)
   end
 
   def flush_per_tags(step) # returns map of tag - message
-    flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+    flushed = nil
+    @mutex.synchronize {
+      flushed,@counts = @counts,count_initialized(@counts.keys.dup.select{|k| @counts[k][-1] > 0})
+    }
     generate_output_per_tags(flushed, step)
   end
 
@@ -302,12 +308,14 @@ class Fluent::DataCounterOutput < Fluent::Output
           stored[:patterns]  == @patterns
 
           if Fluent::Engine.now <= stored[:saved_at] + tick
-            @counts = stored[:counts]
-            @saved_at = stored[:saved_at]
-            @saved_duration = stored[:saved_duration]
+            @mutex.synchronize {
+              @counts = stored[:counts]
+              @saved_at = stored[:saved_at]
+              @saved_duration = stored[:saved_duration]
 
-            # skip the saved duration to continue counting
-            @last_checked = Fluent::Engine.now - @saved_duration
+              # skip the saved duration to continue counting
+              @last_checked = Fluent::Engine.now - @saved_duration
+            }
           else
             log.warn "out_datacounter: stored data is outdated. ignore stored data"
           end
