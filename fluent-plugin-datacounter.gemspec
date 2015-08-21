@@ -7,7 +7,7 @@ Gem::Specification.new do |gem|
   gem.homepage    = "https://github.com/tagomoris/fluent-plugin-datacounter"
   gem.summary     = %q{Fluentd plugin to count records with specified regexp patterns}
   gem.description = %q{To count records with string fields by regexps (To count records with numbers, use numeric-counter)}
-  gem.license     = "APLv2"
+  gem.license     = "Apache-2.0"
 
   gem.files         = `git ls-files`.split("\n")
   gem.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
