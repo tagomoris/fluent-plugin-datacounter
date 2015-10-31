@@ -6,6 +6,11 @@ class Fluent::DataCounterOutput < Fluent::Output
     define_method("log") { $log }
   end
 
+  # Define `router` method of v0.12 to support v0.10 or earlier
+  unless method_defined?(:router)
+    define_method("router") { Fluent::Engine }
+  end
+
   def initialize
     super
     require 'pathname'
@@ -221,12 +226,12 @@ class Fluent::DataCounterOutput < Fluent::Output
       # tag - message maps
       time = Fluent::Engine.now
       flush_per_tags(step).each do |tag,message|
-        Fluent::Engine.emit(@tag_prefix_string + tag, time, message)
+        router.emit(@tag_prefix_string + tag, time, message)
       end
     else
       message = flush(step)
       if message.keys.size > 0
-        Fluent::Engine.emit(@tag, Fluent::Engine.now, message)
+        router.emit(@tag, Fluent::Engine.now, message)
       end
     end
   end
