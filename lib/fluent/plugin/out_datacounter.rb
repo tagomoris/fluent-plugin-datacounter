@@ -18,22 +18,35 @@ class Fluent::DataCounterOutput < Fluent::Output
 
   PATTERN_MAX_NUM = 20
 
-  config_param :count_interval, :time, :default => nil
-  config_param :unit, :string, :default => 'minute'
-  config_param :output_per_tag, :bool, :default => false
-  config_param :aggregate, :string, :default => 'tag'
-  config_param :tag, :string, :default => 'datacount'
-  config_param :tag_prefix, :string, :default => nil
-  config_param :input_tag_remove_prefix, :string, :default => nil
-  config_param :count_key, :string
-  config_param :outcast_unmatched, :bool, :default => false
-  config_param :output_messages, :bool, :default => false
-  config_param :store_file, :string, :default => nil
+  config_param :count_interval, :time, :default => nil,
+               :desc => 'The interval time to count in seconds.'
+  config_param :unit, :string, :default => 'minute',
+               :desc => 'The interval time to monitor specified an unit (either of minute, hour, or day).'
+  config_param :output_per_tag, :bool, :default => false,
+               :desc => 'Emit for each input tag. tag_prefix must be specified together.'
+  config_param :aggregate, :string, :default => 'tag',
+               :desc => 'Calculate in each input tag separetely, or all records in a mass.'
+  config_param :tag, :string, :default => 'datacount',
+               :desc => 'The output tag.'
+  config_param :tag_prefix, :string, :default => nil,
+               :desc => 'The prefix string which will be added to the input tag.'
+  config_param :input_tag_remove_prefix, :string, :default => nil,
+               :desc => 'The prefix string which will be removed from the input tag.'
+  config_param :count_key, :string,
+               :desc => 'The key to count in the event record.'
+  config_param :outcast_unmatched, :bool, :default => false,
+               :desc => 'Specify yes if you do not want to include \'unmatched\' counts into percentage. '
+  config_param :output_messages, :bool, :default => false,
+               :desc => 'Specify yes if you want to get tested messages.'
+  config_param :store_file, :string, :default => nil,
+               :desc => 'Store internal data into a file of the given path on shutdown, and load on starting.'
 
   # pattern0 reserved as unmatched counts
-  config_param :pattern1, :string # string: NAME REGEXP
+  config_param :pattern1, :string, # string: NAME REGEXP
+               :desc => 'Specify RegexpName and Regexp. format: NAME REGEXP'
   (2..PATTERN_MAX_NUM).each do |i|
-    config_param ('pattern' + i.to_s).to_sym, :string, :default => nil # NAME REGEXP
+    config_param ('pattern' + i.to_s).to_sym, :string, :default => nil, # NAME REGEXP
+                 :desc => "Specify RegexpName and Regexp. format: NAME REGEXP"
   end
 
   attr_accessor :tick
