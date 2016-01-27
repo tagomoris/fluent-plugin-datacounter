@@ -26,7 +26,7 @@ DataCounterOutput emits messages contains results data, so you can output these 
 Count messages that have attribute 'referer' as 'google.com', 'yahoo.com' and 'facebook.com' from all messages matched, per minutes.
 
     <match accesslog.**>
-      type datacounter
+      @type datacounter
       unit minute
       aggregate all
       count_key referer
@@ -40,7 +40,7 @@ Count messages that have attribute 'referer' as 'google.com', 'yahoo.com' and 'f
 Or, more exact match pattern, output per tags (default 'aggregate tag'), per hours.
 
     <match accesslog.**>
-      type datacounter
+      @type datacounter
       unit hour
       count_key referer
       # patternX: X(1-20)
@@ -52,7 +52,7 @@ Or, more exact match pattern, output per tags (default 'aggregate tag'), per hou
 HTTP status code patterns.
 
     <match accesslog.**>
-      type datacounter
+      @type datacounter
       count_interval 1m    # just same as 'unit minute' and 'count_interval 60s'
                            # you can also specify '30s', '5m', '2h' ....
       count_key status
@@ -67,7 +67,7 @@ HTTP status code patterns.
 If you want not to include 'unmatched' counts into percentage, use 'outcast_unmatched' configuration:
 
     <match accesslog.**>
-      type datacounter
+      @type datacounter
       count_key status
       # patternX: X(1-20)
       pattern1 2xx ^2\d\d$
@@ -81,7 +81,7 @@ If you want not to include 'unmatched' counts into percentage, use 'outcast_unma
 With 'output_per_tag' option and 'tag_prefix', we get one result message for one tag, like below:
 
     <match accesslog.{foo,bar}>
-      type datacounter
+      @type datacounter
       count_key status
       pattern1 OK ^2\d\d$
       pattern2 NG ^\d\d\d$
@@ -95,7 +95,7 @@ With 'output_per_tag' option and 'tag_prefix', we get one result message for one
 And you can get tested messages count with 'output_messages' option:
 
     <match accesslog.{foo,bar}>
-      type datacounter
+      @type datacounter
       count_key status
       pattern1 OK ^2\d\d$
       pattern2 NG ^\d\d\d$
@@ -106,7 +106,7 @@ And you can get tested messages count with 'output_messages' option:
     #    message: {'foo_messages' => xxx, 'foo_OK_count' => ... }
     
     <match accesslog.baz>
-      type datacounter
+      @type datacounter
       count_key status
       pattern1 OK ^2\d\d$
       pattern2 NG ^\d\d\d$
