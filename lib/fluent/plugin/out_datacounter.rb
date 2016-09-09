@@ -5,16 +5,6 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   helpers :event_emitter
 
-  # Define `log` method for v0.10.42 or earlier
-  unless method_defined?(:log)
-    define_method("log") { $log }
-  end
-
-  # Define `router` method of v0.12 to support v0.10 or earlier
-  unless method_defined?(:router)
-    define_method("router") { Fluent::Engine }
-  end
-
   def initialize
     super
     require 'pathname'
