@@ -1,5 +1,9 @@
-class Fluent::DataCounterOutput < Fluent::Output
+require 'fluent/plugin/output'
+
+class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   Fluent::Plugin.register_output('datacounter', self)
+
+  helpers :event_emitter
 
   # Define `log` method for v0.10.42 or earlier
   unless method_defined?(:log)
@@ -267,7 +271,7 @@ class Fluent::DataCounterOutput < Fluent::Output
     end
   end
 
-  def emit(tag, es, chain)
+  def process(tag, es)
     c = [0] * @patterns.length
 
     es.each do |time,record|
@@ -285,8 +289,6 @@ class Fluent::DataCounterOutput < Fluent::Output
       c[0] += 1 unless matched
     end
     countups(tag, c)
-
-    chain.next
   end
 
   # Store internal status into a file
