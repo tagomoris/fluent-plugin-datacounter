@@ -3,13 +3,14 @@ require 'fluent/plugin/output'
 class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   Fluent::Plugin.register_output('datacounter', self)
 
-  helpers :event_emitter
+  helpers :event_emitter, :storage
 
   def initialize
     super
     require 'pathname'
   end
 
+  DEFAULT_STORAGE_TYPE = 'local'
   PATTERN_MAX_NUM = 20
 
   config_param :count_interval, :time, :default => nil,
@@ -33,7 +34,10 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   config_param :output_messages, :bool, :default => false,
                :desc => 'Specify yes if you want to get tested messages.'
   config_param :store_file, :string, :default => nil,
+               :obsoleted => 'Use store_storage parameter instead.',
                :desc => 'Store internal data into a file of the given path on shutdown, and load on starting.'
+  config_param :store_storage, :bool, :default => false,
+               :desc => 'Store internal data into a storage on shutdown, and load on starting.'
 
   # pattern0 reserved as unmatched counts
   config_param :pattern1, :string, # string: NAME REGEXP
@@ -65,8 +69,8 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
     end
 
     @aggregate = case @aggregate
-                 when 'tag' then :tag
-                 when 'all' then :all
+                 when 'tag' then "tag"
+                 when 'all' then "all"
                  else
                    raise Fluent::ConfigError, "datacounter aggregate allows tag/all"
                  end
@@ -103,11 +107,10 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
       @removed_length = @removed_prefix_string.length
     end
 
-    if @store_file
-      f = Pathname.new(@store_file)
-      if (f.exist? && !f.writable_real?) || (!f.exist? && !f.parent.writable_real?)
-        raise Fluent::ConfigError, "#{@store_file} is not writable"
-      end
+    if @store_storage
+      config = conf.elements.select{|e| e.name == 'storage'}.first
+      @storage = storage_create(usage: 'out_datacounter_store', conf: config,
+                                default_type: DEFAULT_STORAGE_TYPE)
     end
 
     @counts = count_initialized
@@ -116,7 +119,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   def start
     super
-    load_status(@store_file, @tick) if @store_file
+    load_status(@tick) if @store_storage
     start_watch
   end
 
@@ -124,13 +127,13 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
     super
     @watcher.terminate
     @watcher.join
-    save_status(@store_file) if @store_file
+    save_status() if @store_storage
   end
 
   def count_initialized(keys=nil)
     # counts['tag'][num] = count
     # counts['tag'][-1] = sum
-    if @aggregate == :all
+    if @aggregate == "all"
       {'all' => ([0] * (@patterns.length + 1))}
     elsif keys
       values = Array.new(keys.length) {|i|
@@ -143,7 +146,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def countups(tag, counts)
-    if @aggregate == :all
+    if @aggregate == "all"
       tag = 'all'
     end
 
@@ -189,7 +192,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def generate_output(counts, step)
-    if @aggregate == :all
+    if @aggregate == "all"
       return generate_fields(step, counts['all'], '', {})
     end
 
@@ -201,7 +204,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def generate_output_per_tags(counts, step)
-    if @aggregate == :all
+    if @aggregate == "all"
       return {'all' => generate_fields(step, counts['all'], '', {})}
     end
 
@@ -283,58 +286,67 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   # Store internal status into a file
   #
-  # @param [String] file_path
-  def save_status(file_path)
+  def save_status()
     begin
-      Pathname.new(file_path).open('wb') do |f|
-        @saved_at = Fluent::Engine.now
-        @saved_duration = @saved_at - @last_checked
-        Marshal.dump({
-          :counts           => @counts,
-          :saved_at        => @saved_at,
-          :saved_duration  => @saved_duration,
-          :aggregate        => @aggregate,
-          :count_key        => @count_key,
-          :patterns         => @patterns,
-        }, f)
-      end
+      @saved_at = Fluent::Engine.now
+      @saved_duration = @saved_at - @last_checked
+      patterns = @patterns.map{|idx, label, regexp|
+        if regexp
+          [idx, label, regexp.source]
+        else
+          [idx, label, regexp]
+        end
+      }
+      value = {
+        "counts"           => @counts,
+        "saved_at"        => @saved_at,
+        "saved_duration"  => @saved_duration,
+        "aggregate"        => @aggregate,
+        "count_key"        => @count_key,
+        "patterns"         => patterns,
+      }
+      @storage.put(:stored_value, value)
     rescue => e
-      log.warn "out_datacounter: Can't write store_file #{e.class} #{e.message}"
+      log.warn "out_datacounter: Can't write store_storage #{e.class} #{e.message}"
     end
   end
 
   # Load internal status from a file
   #
-  # @param [String] file_path
   # @param [Interger] tick The count interval
-  def load_status(file_path, tick)
-    return unless (f = Pathname.new(file_path)).exist?
+  def load_status(tick)
+    return unless @storage.get(:stored_value)
 
     begin
-      f.open('rb') do |f|
-        stored = Marshal.load(f)
-        if stored[:aggregate] == @aggregate and
-          stored[:count_key] == @count_key and
-          stored[:patterns]  == @patterns
-
-          if Fluent::Engine.now <= stored[:saved_at] + tick
-            @mutex.synchronize {
-              @counts = stored[:counts]
-              @saved_at = stored[:saved_at]
-              @saved_duration = stored[:saved_duration]
-
-              # skip the saved duration to continue counting
-              @last_checked = Fluent::Engine.now - @saved_duration
-            }
-          else
-            log.warn "out_datacounter: stored data is outdated. ignore stored data"
-          end
+      stored = @storage.get(:stored_value)
+      patterns = stored["patterns"].map{|idx, label, regexp|
+        if regexp
+          [idx, label, Regexp.compile(regexp)]
         else
-          log.warn "out_datacounter: configuration param was changed. ignore stored data"
+          [idx, label, regexp]
         end
+      }
+      if stored["aggregate"] == @aggregate and
+        stored["count_key"] == @count_key and
+        patterns == @patterns
+
+        if Fluent::Engine.now <= stored["saved_at"] + tick
+          @mutex.synchronize {
+            @counts = stored["counts"]
+            @saved_at = stored["saved_at"]
+            @saved_duration = stored["saved_duration"]
+
+            # skip the saved duration to continue counting
+            @last_checked = Fluent::Engine.now - @saved_duration
+          }
+        else
+          log.warn "out_datacounter: stored data is outdated. ignore stored data"
+        end
+      else
+        log.warn "out_datacounter: configuration param was changed. ignore stored data"
       end
     rescue => e
-      log.warn "out_datacounter: Can't load store_file #{e.class} #{e.message}"
+      log.warn "out_datacounter: Can't load store_storage #{e.class} #{e.message}"
     end
   end
 

@@ -6,6 +6,10 @@ class DataCounterOutputTest < Test::Unit::TestCase
     Fluent::Test.setup
   end
 
+  def config_element(name = 'test', argument = '', params = {}, elements = [])
+    Fluent::Config::Element.new(name, argument, params, elements)
+  end
+
   CONFIG = %[
     unit minute
     aggregate tag
@@ -74,7 +78,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern1 ok ^2\\d\\d$
     ]
     assert_equal 60, d.instance.tick
-    assert_equal :tag, d.instance.aggregate
+    assert_equal "tag", d.instance.aggregate
     assert_equal 'datacount', d.instance.tag
     assert_nil d.instance.input_tag_remove_prefix
     assert_equal 'field', d.instance.count_key
@@ -92,7 +96,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern1 ok ^2\\d\\d$
     ]
     assert_equal d1.instance.tick, d2.instance.tick
-    
+
     d = create_driver %[
       count_interval 5m
       count_key field
@@ -353,11 +357,11 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 60, r1['tag1_status4xx_count']
     assert_equal 1.0, r1['tag1_status4xx_rate']
     assert_equal 25.0, r1['tag1_status4xx_percentage']
-    
+
     assert_equal 60, r1['tag1_unmatched_count']
     assert_equal 1.0, r1['tag1_unmatched_rate']
     assert_equal 25.0, r1['tag1_unmatched_percentage']
-    
+
     assert_equal 0, r1['tag1_status3xx_count']
     assert_equal 0.0, r1['tag1_status3xx_rate']
     assert_equal 0.0, r1['tag1_status3xx_percentage']
@@ -469,11 +473,11 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal 60, r['status4xx_count']
     assert_equal 1.0, r['status4xx_rate']
     assert_equal 25.0, r['status4xx_percentage']
-    
+
     assert_equal 60, r['unmatched_count']
     assert_equal 1.0, r['unmatched_rate']
     assert_equal 25.0, r['unmatched_percentage']
-    
+
     assert_equal 0, r['status3xx_count']
     assert_equal 0.0, r['status3xx_rate']
     assert_equal 0.0, r['status3xx_percentage']
@@ -661,14 +665,34 @@ class DataCounterOutputTest < Test::Unit::TestCase
     file = "#{dir}/test.dat"
     File.unlink file if File.exist? file
 
+    config = {
+      "unit" =>  "minute",
+      "aggregate" => "tag",
+      "input_tag_remove_prefix" => "test",
+      "count_key" =>  " target",
+      "pattern1" => "status2xx ^2\\d\\d$",
+      "pattern2" => "status3xx ^3\\d\\d$",
+      "pattern3" => "status4xx ^4\\d\\d$",
+      "pattern4" => "status5xx ^5\\d\\d$",
+      "store_storage" => true
+    }
+    conf = config_element('ROOT', '', config, [
+                            config_element(
+                              'storage', '',
+                              {'@type' => 'local',
+                               '@id' => 'test-01',
+                               'path' => "#{file}",
+                               'persistent' => true,
+                               })
+                           ])
     # test store
-    d = create_driver(CONFIG + %[store_file #{file}])
+    d = create_driver(conf)
+    time = Fluent::Engine.now
     d.run(default_tag: 'test.input') do
       d.instance.flush_emit(60)
-      d.feed({'target' => 1})
-      d.feed({'target' => 1})
-      d.feed({'target' => 1})
-      d.instance.shutdown
+      d.feed(time, {'target' => 1})
+      d.feed(time, {'target' => 1})
+      d.feed(time, {'target' => 1})
     end
     stored_counts = d.instance.counts
     stored_saved_at = d.instance.saved_at
@@ -676,38 +700,41 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert File.exist? file
 
     # test load
-    d = create_driver(CONFIG + %[store_file #{file}])
+    d = create_driver(conf)
+    loaded_counts = 0
+    loaded_saved_at = 0
+    loaded_saved_duration = 0
     d.run(default_tag: 'test.input') do
       loaded_counts = d.instance.counts
       loaded_saved_at = d.instance.saved_at
       loaded_saved_duration = d.instance.saved_duration
-      assert_equal stored_counts, loaded_counts
-      assert_equal stored_saved_at, loaded_saved_at
-      assert_equal stored_saved_duration, loaded_saved_duration
     end
+    assert_equal stored_counts, loaded_counts
+    assert_equal stored_saved_at, loaded_saved_at
+    assert_equal stored_saved_duration, loaded_saved_duration
 
     # test not to load if config is changed
-    d = create_driver(CONFIG + %[count_key foobar store_file #{file}])
+    d = create_driver(conf.merge("count_key" => "foobar", "store_storage" => true))
     d.run(default_tag: 'test.input') do
       loaded_counts = d.instance.counts
       loaded_saved_at = d.instance.saved_at
       loaded_saved_duration = d.instance.saved_duration
-      assert_equal({}, loaded_counts)
-      assert_equal(nil, loaded_saved_at)
-      assert_equal(nil, loaded_saved_duration)
     end
+    assert_equal({}, loaded_counts)
+    assert_equal(nil, loaded_saved_at)
+    assert_equal(nil, loaded_saved_duration)
 
     # test not to load if stored data is outdated.
     Delorean.jump 61 # jump more than count_interval
-    d = create_driver(CONFIG + %[store_file #{file}])
+    d = create_driver(conf.merge("store_storage" => true))
     d.run(default_tag: 'test.input') do
       loaded_counts = d.instance.counts
       loaded_saved_at = d.instance.saved_at
       loaded_saved_duration = d.instance.saved_duration
-      assert_equal({}, loaded_counts)
-      assert_equal(nil, loaded_saved_at)
-      assert_equal(nil, loaded_saved_duration)
     end
+    assert_equal({}, loaded_counts)
+    assert_equal(nil, loaded_saved_at)
+    assert_equal(nil, loaded_saved_duration)
     Delorean.back_to_the_present
 
     File.unlink file
