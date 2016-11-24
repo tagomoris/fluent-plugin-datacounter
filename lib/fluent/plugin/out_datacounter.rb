@@ -6,10 +6,6 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   helpers :event_emitter, :storage, :timer
 
-  def initialize
-    super
-  end
-
   DEFAULT_STORAGE_TYPE = 'local'
   PATTERN_MAX_NUM = 20
 
