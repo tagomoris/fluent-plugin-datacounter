@@ -1,3 +1,4 @@
+require 'pathname'
 require 'fluent/plugin/output'
 
 class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
@@ -7,7 +8,6 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   def initialize
     super
-    require 'pathname'
   end
 
   DEFAULT_STORAGE_TYPE = 'local'
