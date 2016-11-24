@@ -659,7 +659,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     end
   end
 
-  def test_store_file
+  def test_store_storage
     dir = "test/tmp"
     Dir.mkdir dir unless Dir.exist? dir
     file = "#{dir}/test.dat"
