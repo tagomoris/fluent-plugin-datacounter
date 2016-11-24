@@ -41,33 +41,33 @@ class DataCounterOutputTest < Test::Unit::TestCase
 
   def test_configure
     assert_raise(Fluent::ConfigError) {
-      d = create_driver('')
+      create_driver('')
     }
     assert_raise(Fluent::ConfigError) {
-      d = create_driver %[
+      create_driver %[
         count_key field
       ]
     }
     assert_raise(Fluent::ConfigError) {
-      d = create_driver %[
+      create_driver %[
         pattern1 hoge ^1\\d\\d$
       ]
     }
     assert_raise(Fluent::ConfigError) {
-      d = create_driver %[
+      create_driver %[
         count_key field
         pattern2 hoge ^1\\d\\d$
       ]
     }
     assert_raise(Fluent::ConfigError) {
-      d = create_driver %[
+      create_driver %[
         count_key field
         pattern1 hoge ^1\\d\\d$
         pattern4 pos  ^4\\d\\d$
       ]
     }
     assert_raise(Fluent::ConfigError) {
-      d = create_driver %[
+      create_driver %[
         count_key field
         pattern1 hoge ^1\\d\\d$
         pattern2 hoge ^4\\d\\d$
