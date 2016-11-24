@@ -3,7 +3,7 @@ require 'fluent/plugin/output'
 class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   Fluent::Plugin.register_output('datacounter', self)
 
-  helpers :event_emitter, :storage
+  helpers :event_emitter, :storage, :timer
 
   def initialize
     super
@@ -125,8 +125,6 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   def shutdown
     super
-    @watcher.terminate
-    @watcher.join
     save_status() if @store_storage
   end
 
@@ -248,19 +246,16 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   def start_watch
     # for internal, or tests only
-    @watcher = Thread.new(&method(:watch))
+    @last_checked ||= Fluent::Engine.now
+    timer_execute(:out_datacounter_timer, 0.5, &method(:watch))
   end
 
   def watch
     # instance variable, and public accessable, for test
-    @last_checked ||= Fluent::Engine.now
-    while true
-      sleep 0.5
-      if Fluent::Engine.now - @last_checked >= @tick
-        now = Fluent::Engine.now
-        flush_emit(now - @last_checked)
-        @last_checked = now
-      end
+    if Fluent::Engine.now - @last_checked >= @tick
+      now = Fluent::Engine.now
+      flush_emit(now - @last_checked)
+      @last_checked = now
     end
   end
 
