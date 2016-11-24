@@ -275,7 +275,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
     countups(tag, c)
   end
 
-  # Store internal status into a file
+  # Store internal status into a storage
   #
   def save_status()
     begin
@@ -302,7 +302,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
     end
   end
 
-  # Load internal status from a file
+  # Load internal status from a storage
   #
   # @param [Interger] tick The count interval
   def load_status(tick)
