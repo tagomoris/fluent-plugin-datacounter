@@ -701,9 +701,9 @@ class DataCounterOutputTest < Test::Unit::TestCase
 
     # test load
     d = create_driver(conf)
-    loaded_counts = 0
-    loaded_saved_at = 0
-    loaded_saved_duration = 0
+    loaded_counts = {}
+    loaded_saved_at = nil
+    loaded_saved_duration = nil
     d.run(default_tag: 'test.input') do
       loaded_counts = d.instance.counts
       loaded_saved_at = d.instance.saved_at
