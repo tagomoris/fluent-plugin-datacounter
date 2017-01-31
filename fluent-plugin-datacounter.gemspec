@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 Gem::Specification.new do |gem|
   gem.name        = "fluent-plugin-datacounter"
-  gem.version     = "0.5.0"
+  gem.version     = "1.0.0"
   gem.authors     = ["TAGOMORI Satoshi"]
   gem.email       = ["tagomoris@gmail.com"]
   gem.homepage    = "https://github.com/tagomoris/fluent-plugin-datacounter"
