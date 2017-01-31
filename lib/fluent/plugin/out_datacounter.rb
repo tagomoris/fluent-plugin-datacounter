@@ -11,11 +11,11 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
 
   config_param :count_interval, :time, default: nil,
                desc: 'The interval time to count in seconds.'
-  config_param :unit, :string, default: 'minute',
+  config_param :unit, :enum, list: [:minute, :hour, :day], default: :minute,
                desc: 'The interval time to monitor specified an unit (either of minute, hour, or day).'
   config_param :output_per_tag, :bool, default: false,
                desc: 'Emit for each input tag. tag_prefix must be specified together.'
-  config_param :aggregate, :string, default: 'tag',
+  config_param :aggregate, :enum, list: [:tag, :all], default: :tag,
                desc: 'Calculate in each input tag separetely, or all records in a mass.'
   config_param :tag, :string, default: 'datacount',
                desc: 'The output tag.'
@@ -43,6 +43,11 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
                  desc: "Specify RegexpName and Regexp. format: NAME REGEXP"
   end
 
+  config_section :storage do
+    config_set_default :usage, 'resume'
+    config_set_default :@type, DEFAULT_STORAGE_TYPE
+  end
+
   attr_accessor :tick
   attr_accessor :counts
   attr_accessor :saved_duration
@@ -56,20 +61,13 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
       @tick = @count_interval.to_i
     else
       @tick = case @unit
-              when 'minute' then 60
-              when 'hour' then 3600
-              when 'day' then 86400
+              when :minute then 60
+              when :hour then 3600
+              when :day then 86400
               else
-                raise RuntimeError, "@unit must be one of minute/hour/day"
+                raise RuntimeError, "BUG: unknown unit: #{@unit}"
               end
     end
-
-    @aggregate = case @aggregate
-                 when 'tag' then "tag"
-                 when 'all' then "all"
-                 else
-                   raise Fluent::ConfigError, "datacounter aggregate allows tag/all"
-                 end
 
     @patterns = [[0, 'unmatched', nil]]
     pattern_names = ['unmatched']
@@ -77,7 +75,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
     pattern_keys = conf.keys.select{|k| k =~ /^pattern(\d+)$/}
     invalids = pattern_keys.select{|arg| arg =~ /^pattern(\d+)/ and not (1..PATTERN_MAX_NUM).include?($1.to_i)}
     if invalids.size > 0
-      log.warn "invalid number patterns (valid pattern number:1-20):" + invalids.join(",")
+      log.warn "invalid number patterns (valid pattern number:1-20)", invalids: invalids
     end
     (1..PATTERN_MAX_NUM).each do |i|
       next unless conf["pattern#{i}"]
@@ -104,30 +102,39 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
     end
 
     if @store_storage
-      config = conf.elements.select{|e| e.name == 'storage'}.first
-      @storage = storage_create(usage: 'out_datacounter_store', conf: config,
-                                default_type: DEFAULT_STORAGE_TYPE)
+      @storage = storage_create(usage: 'resume')
+    end
+
+    if system_config.workers > 1
+      log.warn "Fluentd is now working with multi process workers, and datacounter plugin will produce counter results in each separeted processes."
     end
 
     @counts = count_initialized
     @mutex = Mutex.new
   end
 
+  def multi_workers_ready?
+    true
+  end
+
   def start
     super
+
     load_status(@tick) if @store_storage
-    start_watch
+
+    @last_checked = Fluent::Engine.now
+    timer_execute(:out_datacounter_timer, @tick, &method(:watch))
   end
 
   def shutdown
-    super
     save_status() if @store_storage
+    super
   end
 
   def count_initialized(keys=nil)
     # counts['tag'][num] = count
     # counts['tag'][-1] = sum
-    if @aggregate == "all"
+    if @aggregate == :all
       {'all' => ([0] * (@patterns.length + 1))}
     elsif keys
       values = Array.new(keys.length) {|i|
@@ -140,7 +147,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def countups(tag, counts)
-    if @aggregate == "all"
+    if @aggregate == :all
       tag = 'all'
     end
 
@@ -186,7 +193,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def generate_output(counts, step)
-    if @aggregate == "all"
+    if @aggregate == :all
       return generate_fields(step, counts['all'], '', {})
     end
 
@@ -198,7 +205,7 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def generate_output_per_tags(counts, step)
-    if @aggregate == "all"
+    if @aggregate == :all
       return {'all' => generate_fields(step, counts['all'], '', {})}
     end
 
@@ -226,33 +233,25 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   end
 
   def flush_emit(step)
+    time = Fluent::Engine.now
     if @output_per_tag
       # tag - message maps
-      time = Fluent::Engine.now
       flush_per_tags(step).each do |tag,message|
         router.emit(@tag_prefix_string + tag, time, message)
       end
     else
       message = flush(step)
       if message.keys.size > 0
-        router.emit(@tag, Fluent::Engine.now, message)
+        router.emit(@tag, time, message)
       end
     end
   end
 
-  def start_watch
-    # for internal, or tests only
-    @last_checked ||= Fluent::Engine.now
-    timer_execute(:out_datacounter_timer, 0.5, &method(:watch))
-  end
-
   def watch
     # instance variable, and public accessable, for test
-    if Fluent::Engine.now - @last_checked >= @tick
-      now = Fluent::Engine.now
-      flush_emit(now - @last_checked)
-      @last_checked = now
-    end
+    now = Fluent::Engine.now
+    flush_emit(now - @last_checked)
+    @last_checked = now
   end
 
   def process(tag, es)
@@ -289,16 +288,16 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
         end
       }
       value = {
-        "counts"           => @counts,
-        "saved_at"        => @saved_at,
-        "saved_duration"  => @saved_duration,
-        "aggregate"        => @aggregate,
-        "count_key"        => @count_key,
-        "patterns"         => patterns,
+        "counts"         => @counts,
+        "saved_at"       => @saved_at,
+        "saved_duration" => @saved_duration,
+        "aggregate"      => @aggregate,
+        "count_key"      => @count_key.to_s,
+        "patterns"       => patterns,
       }
       @storage.put(:stored_value, value)
     rescue => e
-      log.warn "out_datacounter: Can't write store_storage #{e.class} #{e.message}"
+      log.warn "Can't write store_storage", error: e
     end
   end
 
@@ -306,10 +305,10 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
   #
   # @param [Interger] tick The count interval
   def load_status(tick)
-    return unless @storage.get(:stored_value)
+    stored = @storage.get(:stored_value)
+    return unless stored
 
     begin
-      stored = @storage.get(:stored_value)
       patterns = stored["patterns"].map{|idx, label, regexp|
         if regexp
           [idx, label, Regexp.compile(regexp)]
@@ -317,7 +316,8 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
           [idx, label, regexp]
         end
       }
-      if stored["aggregate"] == @aggregate and
+
+      if stored["aggregate"] == @aggregate.to_s and
         stored["count_key"] == @count_key and
         patterns == @patterns
 
@@ -331,14 +331,13 @@ class Fluent::Plugin::DataCounterOutput < Fluent::Plugin::Output
             @last_checked = Fluent::Engine.now - @saved_duration
           }
         else
-          log.warn "out_datacounter: stored data is outdated. ignore stored data"
+          log.warn "stored data is outdated. ignore stored data"
         end
       else
-        log.warn "out_datacounter: configuration param was changed. ignore stored data"
+        log.warn "configuration param was changed. ignore stored data"
       end
     rescue => e
-      log.warn "out_datacounter: Can't load store_storage #{e.class} #{e.message}"
+      log.warn "Can't load store_storage", error: e
     end
   end
-
 end
