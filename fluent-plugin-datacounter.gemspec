@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 Gem::Specification.new do |gem|
   gem.name        = "fluent-plugin-datacounter"
-  gem.version     = "0.4.5"
+  gem.version     = "0.5.0"
   gem.authors     = ["TAGOMORI Satoshi"]
   gem.email       = ["tagomoris@gmail.com"]
   gem.homepage    = "https://github.com/tagomoris/fluent-plugin-datacounter"
@@ -14,7 +14,7 @@ Gem::Specification.new do |gem|
   gem.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   gem.require_paths = ["lib"]
 
-  gem.add_runtime_dependency "fluentd"
+  gem.add_runtime_dependency "fluentd", "< 0.14.0"
 
   gem.add_development_dependency "bundler"
   gem.add_development_dependency "rake"
