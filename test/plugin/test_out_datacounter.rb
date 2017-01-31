@@ -1,9 +1,16 @@
 require 'helper'
 require 'fluent/test/driver/output'
+require 'fileutils'
+require 'timecop'
+
 
 class DataCounterOutputTest < Test::Unit::TestCase
   def setup
     Fluent::Test.setup
+  end
+
+  def teardown
+    Timecop.return
   end
 
   def config_element(name = 'test', argument = '', params = {}, elements = [])
@@ -78,7 +85,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
       pattern1 ok ^2\\d\\d$
     ]
     assert_equal 60, d.instance.tick
-    assert_equal "tag", d.instance.aggregate
+    assert_equal :tag, d.instance.aggregate
     assert_equal 'datacount', d.instance.tag
     assert_nil d.instance.input_tag_remove_prefix
     assert_equal 'field', d.instance.count_key
@@ -662,8 +669,8 @@ class DataCounterOutputTest < Test::Unit::TestCase
   def test_store_storage
     dir = "test/tmp"
     Dir.mkdir dir unless Dir.exist? dir
-    file = "#{dir}/test.dat"
-    File.unlink file if File.exist? file
+    storage_path = "#{dir}/test.dat"
+    FileUtils.rm_rf(storage_path)
 
     config = {
       "unit" =>  "minute",
@@ -676,15 +683,8 @@ class DataCounterOutputTest < Test::Unit::TestCase
       "pattern4" => "status5xx ^5\\d\\d$",
       "store_storage" => true
     }
-    conf = config_element('ROOT', '', config, [
-                            config_element(
-                              'storage', '',
-                              {'@type' => 'local',
-                               '@id' => 'test-01',
-                               'path' => "#{file}",
-                               'persistent' => true,
-                               })
-                           ])
+    storage_conf = config_element('storage', 'resume', {'@type' => 'local', '@id' => 'test-01', 'path' => storage_path, 'persistent' => 'true'})
+    conf = config_element('ROOT', '', config, [storage_conf])
     # test store
     d = create_driver(conf)
     time = Fluent::Engine.now
@@ -697,7 +697,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     stored_counts = d.instance.counts
     stored_saved_at = d.instance.saved_at
     stored_saved_duration = d.instance.saved_duration
-    assert File.exist? file
+    assert File.exist?(storage_path)
 
     # test load
     d = create_driver(conf)
@@ -725,7 +725,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal(nil, loaded_saved_duration)
 
     # test not to load if stored data is outdated.
-    Delorean.jump 61 # jump more than count_interval
+    Timecop.freeze(Time.now + 61) # jump more than count_interval
     d = create_driver(conf.merge("store_storage" => true))
     d.run(default_tag: 'test.input') do
       loaded_counts = d.instance.counts
@@ -735,8 +735,7 @@ class DataCounterOutputTest < Test::Unit::TestCase
     assert_equal({}, loaded_counts)
     assert_equal(nil, loaded_saved_at)
     assert_equal(nil, loaded_saved_duration)
-    Delorean.back_to_the_present
 
-    File.unlink file
+    FileUtils.rm_rf(storage_path)
   end
 end
