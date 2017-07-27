@@ -4,10 +4,10 @@ This is a plugin for [Fluentd](http://fluentd.org)
 
 ## Requirements
 
-| fluent-plugin-datacounter | fluentd    | ruby   |
-|---------------------------|------------|--------|
-| >= 1.0.0                  | >= v0.14.8 | >= 2.1 |
-| <  1.0.0                  | <  v0.14.0 | >= 1.9 |
+| fluent-plugin-datacounter | fluentd     | ruby   |
+|---------------------------|-------------|--------|
+| >= 1.0.0                  | >= v0.14.12 | >= 2.1 |
+| <  1.0.0                  | <  v0.14.0  | >= 1.9 |
 
 ## Component
 
@@ -111,7 +111,7 @@ And you can get tested messages count with 'output_messages' option:
     </match>
     # => tag: 'datacount'
     #    message: {'foo_messages' => xxx, 'foo_OK_count' => ... }
-    
+
     <match accesslog.baz>
       @type datacounter
       count_key status
@@ -137,7 +137,7 @@ And you can get tested messages count with 'output_messages' option:
 
 * tag\_prefix
 
-    The prefix string which will be added to the input tag. `output_per_tag yes` must be specified together. 
+    The prefix string which will be added to the input tag. `output_per_tag yes` must be specified together.
 
 * input\_tag\_remove\_prefix
 
